@@ -9,8 +9,9 @@
 # (apps/backend/vercel_app.py) for the Grok routes under /api. All 3D runs in the visitor's browser and the shared
 # session goes straight from the browser to SpacetimeDB. Before --deploy, run `npx vercel login` once yourself.
 #
-# Settings (environment): TEAM_CODE (the passcode for the Grok routes; else read from deploy/vercel/.env.deploy,
-# else made up and saved there), VERCEL_PROJECT (default pss-studio-mhacks), BACKEND (default http://127.0.0.1:8000,
+# Settings (environment): ORG_CODES (file with the organisations' sign-in codes, which also unlock Grok),
+# TEAM_CODE (the extra team passcode for the Grok routes; else read from deploy/vercel/.env.deploy,
+# else made up and saved there), VERCEL_PROJECT (default planetary-scene-studio), BACKEND (default http://127.0.0.1:8000,
 # used once to compute the prepared searches), SKIP_SEARCH=1 (ship without prepared searches), PORT (--serve, 8100),
 # VERCEL_BUILD=1 (also run Vercel's own builder locally on the result, as a check; needs no login).
 set -euo pipefail
@@ -23,7 +24,7 @@ SCENES_SRC=$ROOT/scenes
 SCENES=(mars-hero-01 moon-malapert-01)
 DEFAULT_SCENE=mars-hero-01
 BACKEND=${BACKEND:-http://127.0.0.1:8000}
-PROJECT=${VERCEL_PROJECT:-pss-studio-mhacks}
+PROJECT=${VERCEL_PROJECT:-planetary-scene-studio}
 PY=$ROOT/apps/backend/.venv/bin/python
 MAX_UPLOAD_MB=100 # Hobby plan: what one CLI deployment may upload (vercel.com/docs/limits)
 
@@ -150,22 +151,36 @@ if [ -z "$TEAM_CODE" ]; then
   printf 'TEAM_CODE=%s\n' "$TEAM_CODE" >"$CONFIG/.env.deploy"
   echo "made a new team passcode and saved it in deploy/vercel/.env.deploy"
 fi
+# One code per person: each organisation's sign-in code (checked by SpacetimeDB) must also unlock the Grok routes,
+# so the server gets them all as one comma-separated list. The codes file lives outside the repo.
+ORG_CODES=${ORG_CODES:-$HOME/.config/pss-studio/org-codes-pss-studio-mhacks.env}
+GROK_CODES=$TEAM_CODE
+if [ -f "$ORG_CODES" ]; then
+  for name in PSS_CODE_NASA PSS_CODE_SPACEX PSS_CODE_CONTROL; do
+    code=$(dotenv_value "$ORG_CODES" "$name")
+    [ -n "$code" ] && GROK_CODES="$GROK_CODES,$code"
+  done
+  echo "Grok accepts the team passcode and the organisation sign-in codes from $ORG_CODES ($(printf '%s' "$GROK_CODES" | tr -cd , | wc -c) of 3 found)"
+else
+  echo "no organisation codes file at $ORG_CODES: Grok accepts only the team passcode"
+fi
 [ -n "$(dotenv_value "$ROOT/apps/backend/.env" XAI_API_KEY)" ] || die "XAI_API_KEY is not set in apps/backend/.env"
 
 if [ "$MODE" = --serve ]; then
   say "Serving the staged deployment on http://localhost:${PORT:-8100} (Ctrl+C to stop). Team passcode: $TEAM_CODE"
   cd "$STAGE"
-  XAI_API_KEY=$(dotenv_value "$ROOT/apps/backend/.env" XAI_API_KEY) TEAM_CODE=$TEAM_CODE STAGE=$STAGE \
+  XAI_API_KEY=$(dotenv_value "$ROOT/apps/backend/.env" XAI_API_KEY) TEAM_CODE=$GROK_CODES STAGE=$STAGE \
     exec "$PY" -m uvicorn --app-dir "$CONFIG" serve_local:app --host 127.0.0.1 --port "${PORT:-8100}"
 fi
 
 say "Deploying to Vercel project $PROJECT"
 cd "$STAGE"
 npx --yes vercel whoami >/dev/null || die "not logged in: run  npx vercel login  yourself, then run this again"
+npx --yes vercel project add "$PROJECT" >/dev/null 2>&1 || true # no-op when it already exists
 npx --yes vercel link --yes --project "$PROJECT"
 # Secrets go from the file straight into the CLI's stdin: they are never arguments and never printed.
 dotenv_value "$ROOT/apps/backend/.env" XAI_API_KEY | npx --yes vercel env add XAI_API_KEY production --force
-printf '%s' "$TEAM_CODE" | npx --yes vercel env add TEAM_CODE production --force
+printf '%s' "$GROK_CODES" | npx --yes vercel env add TEAM_CODE production --force
 npx --yes vercel deploy --prod --yes
 say "Deployed. Share the production address above (https://$PROJECT.vercel.app unless the name was taken)."
 echo "Team passcode for Grok chat, voice and concept renders: $TEAM_CODE"

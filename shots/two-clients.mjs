@@ -1,117 +1,15 @@
-// Two browsers in one shared session: the proof that pins, cursors, modules and rover drives sync through
-// SpacetimeDB. Each is its own headless Chromium (own profile), named Ada and Ben. No dependencies (Node 22+).
-// Usage: node shots/two-clients.mjs [sceneId]        writes shots/mp-*.png and prints what each client sees.
-//        MODE=offline node shots/two-clients.mjs    one client, started while the Spacetime server is DOWN:
-//          it must work in memory ("offline, not shared"); start the server while it waits and it goes live
-//          and sends its pin up (shots/mp-offline-*.png).
-// Env: APP_URL (default http://127.0.0.1:5199), GL=hw|sw. Needs the app's dev server and `spacetime start`.
-import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+// Two (or three) browsers in one shared session: the proof that sign-in, scene access, pins, cursors, modules
+// and rover drives go through SpacetimeDB. Each person is its own headless Chromium. No dependencies (Node 22+).
+// Usage: node shots/two-clients.mjs [sceneId]     accounts, then the shared scene; writes shots/mp-*.png
+//        MODE=accounts | shared | offline         one part only. MODE=offline needs a server you can stop:
+//          it prints ">>> stop" and ">>> start" when to stop and start `spacetime start`.
+// Env: APP_URL (default http://127.0.0.1:5199), CODES_FILE (default ~/.config/pss-studio/org-codes-pss-studio-mhacks.env,
+//      written by spacetime/seed-orgs.sh), ROOM, GL=hw|sw.
+import { accountsScenario } from "./mp-accounts.mjs";
+import { loadCodes, open, sleep } from "./mp-browser.mjs";
 
 const sceneId = process.argv[2] ?? "mars-hero-01";
-const APP_URL = process.env.APP_URL ?? "http://127.0.0.1:5199";
-const OUT_DIR = dirname(fileURLToPath(import.meta.url));
-const ROOM = process.env.ROOM ?? `test-${Date.now()}`; // its own session, so a person using the app is not disturbed
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const glFlags =
-  process.env.GL === "sw" ? ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] : ["--use-angle=gl-egl", "--ignore-gpu-blocklist", "--enable-gpu"];
-
-async function open(name) {
-  const chromium = spawn("/usr/lib/chromium/chromium", [
-    "--headless=new", "--remote-debugging-port=0", "--window-size=1600,1000", "--hide-scrollbars",
-    `--user-data-dir=${mkdtempSync(join(tmpdir(), "pss-mp-"))}`, ...glFlags, "about:blank",
-  ]);
-  const port = await new Promise((resolve, reject) => {
-    chromium.stderr.on("data", (chunk) => {
-      const match = /DevTools listening on ws:\/\/[^:]+:(\d+)\//.exec(String(chunk));
-      if (match) resolve(match[1]);
-    });
-    chromium.on("exit", (code) => reject(new Error(`chromium exited ${code}`)));
-  });
-  const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  const ws = new WebSocket(targets.find((t) => t.type === "page").webSocketDebuggerUrl);
-  await new Promise((resolve) => ws.addEventListener("open", resolve));
-  let nextId = 0;
-  const pending = new Map();
-  ws.addEventListener("message", ({ data }) => {
-    const msg = JSON.parse(data);
-    if (msg.id && pending.has(msg.id)) {
-      const { resolve, reject } = pending.get(msg.id);
-      pending.delete(msg.id);
-      msg.error ? reject(new Error(msg.error.message)) : resolve(msg.result);
-    } else if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") {
-      console.log(`[${name} error]`, msg.params.args.map((a) => a.value ?? a.description).join(" ").slice(0, 300));
-    } else if (msg.method === "Runtime.exceptionThrown") {
-      console.log(`[${name} exception]`, msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text);
-    }
-  });
-  const send = (method, params = {}) =>
-    new Promise((resolve, reject) => {
-      pending.set(++nextId, { resolve, reject });
-      ws.send(JSON.stringify({ id: nextId, method, params }));
-    });
-  const evaluate = async (expression) => {
-    const { result, exceptionDetails } = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
-    if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text);
-    return result.value;
-  };
-  await send("Runtime.enable");
-  await send("Page.enable");
-  await send("Emulation.setDeviceMetricsOverride", { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
-  await send("Page.navigate", { url: `${APP_URL}/?scene=${encodeURIComponent(sceneId)}&name=${name}&room=${ROOM}` });
-
-  const client = {
-    name,
-    evaluate,
-    text: () => evaluate("document.body.innerText"),
-    // Waits until the page text matches; fails loudly with what the page says instead.
-    async until(pattern, what, timeoutMs = 60000) {
-      const t0 = Date.now();
-      while (Date.now() - t0 < timeoutMs) {
-        if (pattern.test(await client.text())) return;
-        await sleep(250);
-      }
-      throw new Error(`${name}: timed out waiting for ${what}. Shared panel says: ${await client.section()}`);
-    },
-    section: () => evaluate(`(document.querySelector("section.shared")?.innerText ?? "no shared panel").replace(/\\s+/g, " ")`),
-    async shoot(file) {
-      const { data } = await send("Page.captureScreenshot", { format: "png" });
-      writeFileSync(join(OUT_DIR, file), Buffer.from(data, "base64"));
-      console.log("wrote", join(OUT_DIR, file));
-    },
-    click: (label) =>
-      evaluate(`(() => { const b = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === ${JSON.stringify(label)});
-        if (!b) throw new Error("no button " + ${JSON.stringify(label)}); b.click(); })()`),
-    type: (selector, value) =>
-      evaluate(`(() => { const input = document.querySelector(${JSON.stringify(selector)});
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, ${JSON.stringify(value)});
-        input.dispatchEvent(new Event("input", { bubbles: true })); })()`),
-    async chat(message) {
-      await client.type(".chat-input input", message);
-      await sleep(100);
-      await evaluate(`document.querySelector(".chat-input").requestSubmit()`);
-      await sleep(900);
-      return evaluate(`[...document.querySelectorAll(".chat-message.from-rover .chat-text")].pop()?.innerText`);
-    },
-    // A real mouse at viewport pixel (x, y): moves, and presses when asked.
-    async mouse(x, y, press = false) {
-      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-      if (!press) return;
-      await send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
-      await send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
-    },
-    view: (eye, target) => evaluate(`window.__sceneRoot.setViewSite(${JSON.stringify(eye)}, ${JSON.stringify(target)})`),
-    scrollToShared: () => evaluate(`document.querySelector("section.shared").scrollIntoView()`),
-    close() {
-      ws.close();
-      chromium.kill();
-    },
-  };
-  return client;
-}
+const codes = loadCodes();
 
 const EYE = [75, -170, 120];
 const TARGET = [75, 20, 0];
@@ -120,11 +18,15 @@ const hideGrade = (c) =>
   c.evaluate(`(() => { const box = [...document.querySelectorAll("label.checkbox")].find((l) => l.textContent.includes("Show grade"))?.querySelector("input");
     if (box?.checked) box.click(); })()`);
 
+// A signed-in person loses the server mid-session, keeps working in memory, and is live again when it returns.
 async function offlineScenario() {
-  const cy = await open("Cy");
+  const cy = await open("Cy", { scene: sceneId });
   clients.push(cy);
-  await cy.until(/offline, not shared/, "the offline chip", 120000);
+  await cy.signIn(codes.control);
+  await cy.until(/live, 1 person/, "the live chip", 120000);
   await cy.until(/Best sites[\s\S]*Site 1/i, "the scene to load", 120000);
+  console.log(">>> stop the Spacetime server now");
+  await cy.until(/offline: access not checked, not shared/, "the offline chip", 120000);
   await hideGrade(cy);
   await cy.view(EYE, TARGET);
   await cy.scrollToShared();
@@ -150,15 +52,20 @@ async function offlineScenario() {
 }
 
 try {
-  if (process.env.MODE === "offline") await offlineScenario();
-  else await sharedScenario();
+  const mode = process.env.MODE ?? "all";
+  if (mode === "offline") await offlineScenario();
+  if (mode === "accounts" || mode === "all") await accountsScenario(codes, clients);
+  if (mode === "shared" || mode === "all") await sharedScenario();
 } finally {
   for (const c of clients) c.close();
 }
 
 async function sharedScenario() {
-  const [ada, ben] = await Promise.all([open("Ada"), open("Ben")]);
+  // Two organisations that both have this scene: Ada from NASA, Ben from mission control.
+  const [ada, ben] = await Promise.all([open("Ada", { scene: sceneId }), open("Ben", { scene: sceneId })]);
   clients.push(ada, ben);
+  await ada.signIn(codes.nasa);
+  await ben.signIn(codes.control);
   for (const c of clients) await c.until(/live, 2 people/, "the live chip with both people", 120000);
   for (const c of clients) {
     await hideGrade(c);
@@ -236,5 +143,14 @@ async function sharedScenario() {
   await sleep(1500);
   if (/Rover start/.test(await ben.section())) throw new Error("Ben still lists the pin Ada deleted");
   console.log("8. reset+delete Ben:", await ben.section());
+
+  // 9. A third person on the scene list sees who is live in the Mars scene, by name.
+  const zoe = await open("Zoe");
+  clients.push(zoe);
+  await zoe.signIn(codes.control);
+  await zoe.until(/2 live\s*Ada\s*Ben/, "Ada and Ben shown live on Zoe's Mars card");
+  await sleep(500);
+  await zoe.shoot("mp-acc-6-scenes-two-live.png");
+  console.log("9. presence   Zoe:", (await zoe.text()).match(/2 live\s*Ada\s*Ben/)?.[0].replace(/\s+/g, " "));
   console.log("two clients: ok");
 }

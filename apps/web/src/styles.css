@@ -598,6 +598,7 @@ details.fold > summary {
 .shell-body {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .home {
@@ -641,4 +642,86 @@ button.scene-card {
 
 button.scene-card:hover {
   border-color: #4fd1ff;
+}
+
+/* Landing page: the access-code box over a picture of the Mars scene. */
+.landing {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  background:
+    linear-gradient(180deg, rgba(11, 13, 18, 0.55), rgba(11, 13, 18, 0.2) 40%, rgba(11, 13, 18, 0.85)),
+    url("/landing-mars.jpg") center / cover no-repeat #0b0d12;
+  position: relative;
+}
+
+.landing-card {
+  display: grid;
+  gap: 12px;
+  width: min(400px, calc(100% - 32px));
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(13, 16, 22, 0.62);
+  backdrop-filter: blur(14px);
+}
+
+.landing-card h1 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: -0.01em;
+}
+
+.landing-card .eyebrow,
+.landing-card p {
+  margin: 0;
+}
+
+.landing-line {
+  color: #d7d3cd;
+}
+
+.landing-card input {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(11, 13, 18, 0.7);
+  color: #e8e6e3;
+  font: inherit;
+  font-size: 15px;
+}
+
+.landing-card input:focus {
+  outline: 2px solid #4fd1ff;
+  outline-offset: 1px;
+}
+
+.landing-card button {
+  padding: 10px;
+  border-color: #4fd1ff;
+  background: #123041;
+  font-size: 15px;
+}
+
+.landing-foot {
+  position: absolute;
+  bottom: 16px;
+  margin: 0;
+  font-size: 12px;
+  color: #c9ced8;
+}
+
+.scene-live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-person .dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border-radius: 50%;
 }

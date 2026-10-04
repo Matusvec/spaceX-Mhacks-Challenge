@@ -64,7 +64,9 @@ export function openLink(onChange: (link: Link | null, error: string | null) => 
             .subscribe([tables.organisation, tables.member, tables.user, tables.myScenes]);
         })
         .onConnectError((_ctx, err) => {
-          tokenStore()?.removeItem(TOKEN_KEY); // a token from another server is refused; start fresh next time
+          // The token is the account: keep it through an unreachable server. Only a token the server
+          // refuses (one issued by a different server) is dropped, so the next try gets a fresh identity.
+          if (/401|403|unauthori[sz]ed|invalid token/i.test(errorText(err))) tokenStore()?.removeItem(TOKEN_KEY);
           drop(`cannot reach ${SPACETIME_URI}: ${errorText(err)}`);
         })
         .onDisconnect(() => drop(live ? "connection lost, retrying" : `cannot reach ${SPACETIME_URI}, retrying`))

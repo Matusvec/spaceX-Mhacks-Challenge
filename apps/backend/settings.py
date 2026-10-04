@@ -20,7 +20,7 @@ XAI_TEXT_MODEL = os.environ.get("XAI_TEXT_MODEL", "grok-4.20-0309-non-reasoning"
 XAI_IMAGE_MODEL = os.environ.get("XAI_IMAGE_MODEL", "grok-imagine-image-2.0")
 XAI_STT_MODEL = os.environ.get("XAI_STT_MODEL", "grok-voice-transcribe-2.0")
 XAI_VOICE_ID = os.environ.get("XAI_VOICE_ID", "eve")
-# Team passcode for every Grok route (xai.require_team_code). Unset: open, which is right for local dev only.
+# Passcode(s) for every Grok route (xai.require_team_code), comma-separated. Unset: open, right for local dev only.
 TEAM_CODE = os.environ.get("TEAM_CODE", "")
 # Serverless deployment (vercel_app.py): no durable disk, so a render goes back in the response and nothing is saved.
 STATELESS = os.environ.get("PSS_STATELESS") == "1"

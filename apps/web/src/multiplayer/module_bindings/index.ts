@@ -38,6 +38,7 @@ import AddPinReducer from "./add_pin_reducer";
 import AdminSetOrganisationReducer from "./admin_set_organisation_reducer";
 import DeleteModuleReducer from "./delete_module_reducer";
 import DriveRoverReducer from "./drive_rover_reducer";
+import EnterReducer from "./enter_reducer";
 import HideCursorReducer from "./hide_cursor_reducer";
 import JoinReducer from "./join_reducer";
 import MoveModuleReducer from "./move_module_reducer";
@@ -166,6 +167,7 @@ const reducersSchema = __reducers(
   __reducerSchema("admin_set_organisation", AdminSetOrganisationReducer),
   __reducerSchema("delete_module", DeleteModuleReducer),
   __reducerSchema("drive_rover", DriveRoverReducer),
+  __reducerSchema("enter", EnterReducer),
   __reducerSchema("hide_cursor", HideCursorReducer),
   __reducerSchema("join", JoinReducer),
   __reducerSchema("move_module", MoveModuleReducer),

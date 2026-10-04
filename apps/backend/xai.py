@@ -11,8 +11,14 @@ NO_KEY_MESSAGE = "XAI_API_KEY is not set " + ("on the server" if settings.STATEL
 
 
 def team_code_ok(code: str | None) -> bool:
-    """True when no passcode is required or `code` is the right one."""
-    return not settings.TEAM_CODE or secrets.compare_digest((code or "").encode(), settings.TEAM_CODE.encode())
+    """True when no passcode is required or `code` is one of the accepted ones.
+
+    TEAM_CODE may list several codes separated by commas (each organisation's sign-in code and the team code),
+    so the code a person signs in with also unlocks Grok. Case and surrounding spaces do not matter."""
+    accepted = [entry.strip().lower() for entry in settings.TEAM_CODE.split(",") if entry.strip()]
+    given = (code or "").strip().lower().encode()
+    # Every entry is compared, each in constant time, so the answer's timing does not point at an entry.
+    return not accepted or any([secrets.compare_digest(given, entry.encode()) for entry in accepted])
 
 
 def require_team_code(x_team_code: str | None = Header(None)) -> None:

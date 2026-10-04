@@ -35,6 +35,18 @@ export const signIn = spacetimedb.reducer({ name: t.string(), orgId: t.string(),
   else ctx.db.member.insert(row);
 });
 
+// The landing page's one box: the access code alone says which organisation the caller joins.
+export const enter = spacetimedb.reducer({ name: t.string(), code: t.string() }, (ctx, args) => {
+  const name = clean(args.name, MAX_NAME, 'name');
+  const code = args.code.trim().toUpperCase();
+  let orgId: string | null = null;
+  for (const secret of ctx.db.organisationSecret.iter()) if (secret.code === code) orgId = secret.orgId;
+  if (!orgId) throw new SenderError('that access code is not recognised');
+  const row = { identity: ctx.sender, name, orgId, joinedAt: ctx.timestamp };
+  if (ctx.db.member.identity.find(ctx.sender)) ctx.db.member.identity.update(row);
+  else ctx.db.member.insert(row);
+});
+
 export const signOut = spacetimedb.reducer((ctx) => {
   ctx.db.member.identity.delete(ctx.sender);
   ctx.db.cursor.identity.delete(ctx.sender);

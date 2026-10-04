@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { SceneManifest } from "../contracts";
-import { rememberedForm, type Account } from "../multiplayer/useAccount";
+import { rememberedName, type Account } from "../multiplayer/useAccount";
 import { bundleFileUrl } from "../scene/loadBundle";
 
 // What the cards show comes from each bundle's scene.json; fetched once per scene id.
@@ -47,19 +47,21 @@ function describe(manifest: SceneManifest): string {
   return `${km(width)} × ${km(depth)} of terrain at ${manifest.terrain.resolution_m} m/px${splat} · ${manifest.sources.length} cited sources`;
 }
 
-function SignIn({ account }: { account: Account }) {
-  const [form, setForm] = useState(rememberedForm);
+// The landing page is the sign-in: one access-code box over a picture of our own Mars scene.
+function Landing({ account }: { account: Account }) {
+  const [name, setName] = useState(rememberedName);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const orgId = form.orgId || account.organisations[0]?.id || "";
+  const connecting = account.status === "connecting";
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await account.signIn(form.name, orgId, code);
+      // No name given: a generated one; the shared panel asks for a real one inside the scene.
+      await account.enter(name.trim() || `Explorer ${Math.floor(Math.random() * 900 + 100)}`, code);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -68,38 +70,33 @@ function SignIn({ account }: { account: Account }) {
   };
 
   return (
-    <form className="home-card signin" onSubmit={submit}>
-      <h1>Sign in</h1>
-      <label className="field">
-        Your name
-        <input name="signin-name" value={form.name} maxLength={32} autoFocus onChange={(e) => setForm({ ...form, name: e.target.value })} />
-      </label>
-      <label className="field">
-        Organisation
-        <select name="signin-org" value={orgId} onChange={(e) => setForm({ ...form, orgId: e.target.value })}>
-          {account.organisations.map((org) => (
-            <option key={org.id} value={org.id}>
-              {org.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field">
-        Organisation access code
-        <input name="signin-code" type="password" value={code} autoComplete="off" onChange={(e) => setCode(e.target.value)} />
-      </label>
-      {error && <p className="error">{error}</p>}
-      {account.organisations.length === 0 && <p className="error">No organisations are set up on the session server yet.</p>}
-      <div className="buttons">
-        <button type="submit" disabled={busy || !form.name.trim() || !code || !orgId}>
-          {busy ? "Checking…" : "Sign in"}
+    <div className="landing">
+      <form className="landing-card" onSubmit={submit}>
+        <p className="eyebrow">Mars · Moon</p>
+        <h1>Planetary Scene Studio</h1>
+        <p className="landing-line">Plan a base on Mars or the Moon, on the real ground, together.</p>
+        <input
+          name="signin-code"
+          type="password"
+          aria-label="Access code"
+          placeholder="Access code"
+          value={code}
+          autoComplete="off"
+          autoFocus
+          onChange={(e) => setCode(e.target.value)}
+        />
+        <input name="signin-name" aria-label="Your name" placeholder="Your name (optional)" value={name} maxLength={32} onChange={(e) => setName(e.target.value)} />
+        <button type="submit" disabled={busy || connecting || !code.trim()}>
+          {connecting ? "Connecting…" : busy ? "Checking…" : "Enter"}
         </button>
-      </div>
-      <p className="muted small">
-        The code is checked by the session server (SpacetimeDB), which then lists your organisation's scenes and lets you
-        edit their shared pins, modules and rover. This browser is remembered; there is no password or e-mail.
+        {error && <p className="error">{error}</p>}
+        <p className="muted small">Your organisation's code opens its scenes. This browser is remembered.</p>
+      </form>
+      <p className="landing-foot">
+        Live session by SpacetimeDB
+        {!connecting && ` · ${account.live.length} ${account.live.length === 1 ? "person" : "people"} in a scene now`}
       </p>
-    </form>
+    </div>
   );
 }
 
@@ -110,14 +107,16 @@ type Props = {
   onOpen: (sceneId: string) => void;
 };
 
-/** Before a scene is open: connecting, sign-in, or "Your scenes" for the signed-in organisation. */
+/** Before a scene is open: the landing page (access code), or "Your scenes" with who is live in each. */
 export function HomeScreen({ account, offlineSceneIds, denied, onOpen }: Props) {
   const offline = account.status === "offline";
   const sceneIds = offline ? offlineSceneIds : account.sceneIds;
   const cards = useSceneCards(account.status === "connecting" || (!offline && !account.member) ? [] : sceneIds);
 
-  if (account.status === "connecting") return <div className="home"><p className="muted">Connecting to the session server…</p></div>;
-  if (!offline && !account.member) return <div className="home"><SignIn account={account} /></div>;
+  if (!offline && !account.member) return <Landing account={account} />;
+  // Who is in each scene right now, from Spacetime presence (same room as this tab, if it has one).
+  const room = new URLSearchParams(window.location.search).get("room");
+  const liveIn = (id: string) => account.live.filter((person) => person.sceneId === (room ? `${id}#${room}` : id));
 
   return (
     <div className="home">
@@ -143,6 +142,23 @@ export function HomeScreen({ account, offlineSceneIds, denied, onOpen }: Props) 
               <span className="eyebrow">{manifest ? (manifest.body === "mars" ? "Mars" : "Moon") : id}</span>
               <strong>{manifest?.title ?? (typeof card === "string" ? `Could not read this scene (${card})` : "Loading…")}</strong>
               {manifest && <span className="muted small">{describe(manifest)}</span>}
+              {!offline && (
+                <span className="scene-live small">
+                  {liveIn(id).length === 0 ? (
+                    <span className="muted">nobody here right now</span>
+                  ) : (
+                    <>
+                      <span className="chip chip-live">● {liveIn(id).length} live</span>
+                      {liveIn(id).map((person) => (
+                        <span key={person.id} className="live-person">
+                          <span className="dot" style={{ background: person.color }} />
+                          {person.name}
+                        </span>
+                      ))}
+                    </>
+                  )}
+                </span>
+              )}
             </button>
           );
         })}
