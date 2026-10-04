@@ -18,8 +18,8 @@ try {
   await ada.type('input[name="team-chat"]', "Rendering a concept now, watch your Concepts list");
   await sleep(100);
   await ada.evaluate(`document.querySelector(".team-chat-input").requestSubmit()`);
+  await ben.evaluate(`document.querySelector('button[aria-label="Open team chat"]')?.click()`);
   await ben.until(/Rendering a concept now/, "Ada's chat line on Ben's screen");
-  await ben.evaluate(`document.querySelector(".team-chat").scrollIntoView({ block: "end" })`);
   await sleep(400);
   await ben.shoot("mp-live-1-ben-team-chat.png");
 

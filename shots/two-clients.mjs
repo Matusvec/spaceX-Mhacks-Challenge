@@ -105,8 +105,11 @@ async function sharedScenario() {
   await ada.type('input[name="team-chat"]', "Ben, meet me at the outcrop");
   await sleep(100);
   await ada.evaluate(`document.querySelector(".team-chat-input").requestSubmit()`);
+  // Ben's team chat window starts minimized: its bar counts the unread line, then he opens it.
+  await ben.until(/Team chat[\s\S]{0,40}1 new/i, "an unread count on Ben's minimized team chat");
+  await ben.shoot("mp-7a-ben-team-chat-unread.png");
+  await ben.evaluate(`document.querySelector('button[aria-label="Open team chat"]')?.click()`);
   await ben.until(/Ben, meet me at the outcrop/, "Ada's chat line on Ben's screen");
-  await ben.evaluate(`document.querySelector(".team-chat").scrollIntoView({ block: "end" })`);
   await sleep(300);
   await ben.shoot("mp-7-ben-team-chat.png");
   console.log("4b. chat      Ben:", await ben.evaluate(`document.querySelector(".team-chat-messages").innerText.replace(/\\s+/g, " ")`));

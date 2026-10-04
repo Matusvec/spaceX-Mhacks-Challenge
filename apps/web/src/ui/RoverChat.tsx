@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useDraggableWindow } from "./useDraggableWindow";
 import { executeIntent, HELP_TEXT, type ChatReply, type ExecuteContext } from "../rover/executeIntent";
 import { interpret, type ChatTurn } from "../rover/interpret";
 import { sceneFacts } from "../rover/sceneFacts";
@@ -26,6 +27,7 @@ const SUGGESTIONS = ["Where should we build?", "Is site 2 reachable?", "Drive to
 export function RoverChat({ context }: { context: ExecuteContext | null }) {
   // On a laptop-sized window the open chat covers half the view, so it starts minimized there.
   const [open, setOpen] = useState(() => window.innerWidth >= 1500);
+  const win = useDraggableWindow("rover-chat", open); // dragged by its title bar; stays inside the stage
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{ id: 0, from: "rover", text: HELP_TEXT }]);
@@ -74,15 +76,15 @@ export function RoverChat({ context }: { context: ExecuteContext | null }) {
 
   if (!open) {
     return (
-      <button className="chat-toggle" onClick={() => setOpen(true)}>
+      <button className="chat-toggle" ref={win.ref} style={win.style} onClick={() => setOpen(true)}>
         Rover chat
       </button>
     );
   }
 
   return (
-    <div className="chat">
-      <div className="chat-header">
+    <div className="chat" ref={win.ref} style={win.style}>
+      <div className="chat-header" {...win.bar}>
         <span>
           <strong>Rover assistant</strong>
           <span className={`grok-status ${grokStatus}`}>{GROK_STATUS_TEXT[grokStatus]}</span>

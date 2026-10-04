@@ -171,6 +171,7 @@ function Studio({ sceneId, account }: { sceneId: string; account: SharedAccount 
             }
           }
         />
+        <TeamChat shared={shared} />
         {dragging && <div className="drop-overlay">Drop a {SPLAT_EXTENSIONS.join(" / ")} splat to preview it</div>}
       </main>
       <aside className="panel panel-right">
@@ -192,7 +193,6 @@ function Studio({ sceneId, account }: { sceneId: string; account: SharedAccount 
             editingModuleId={sharedSync.editingId}
             onKeepModule={sharedSync.keepModule}
           />
-          <TeamChat shared={shared} />
         </details>
       </aside>
     </div>
