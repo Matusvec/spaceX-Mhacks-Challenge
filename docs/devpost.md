@@ -3,7 +3,7 @@
 Live: https://planetary-scene-studio.vercel.app (needs an access code; give judges the mission-control one)
 Repo: https://github.com/Matusvec/spaceX-Mhacks-Challenge
 
-Every number below is from our own bundle or a cited source. Lines marked TEAM are for a teammate to fill in.
+Every number below is from our own bundle or a cited source.
 
 ## Inspiration
 
@@ -30,7 +30,7 @@ From orbit, the best pictures of Mars are 25 cm per pixel and the best elevation
 - **Grok.** Imagine image-edit API on the captured view, Voice API for speech-to-text and text-to-speech, text API for chat intents. Keys stay on the server.
 - **SpacetimeDB.** One TypeScript module holds presence, pins, modules, rover state, team chat, shared concept renders (the pictures live in rows), organisations and scene access; reducers enforce who may touch which scene. There is no other database.
 - **Hosting.** Static app and scenes on Vercel with one small function for the Grok calls; all 3D runs in the browser.
-- TEAM: how Cursor and Grok Bot were used for planning and building.
+- **Cursor and Grok Bot.** We built in Cursor and planned the whole project with Grok Bot in our team Slack: scoping, splitting the work across three people, and coordinating through the night.
 
 ## Challenges
 

@@ -49,6 +49,7 @@ browser: React + three.js + Spark (all 3D runs here) ◄── static files on V
 - **Moon** (`pipelines/moon`). Horizon, illumination and Earth visibility from LOLA terrain and JPL ephemerides.
 - **Viewer** (`apps/web`). React, TypeScript, plain three.js, Spark for the splat.
 - **Grok** (`apps/backend`). Imagine image-edit on the captured view, Voice for speech in and out, text for intents and grounded answers. The key stays on the server.
+- **Planning.** Cursor for development; Grok Bot in our Slack for project planning and team collaboration.
 - **SpacetimeDB** (`spacetime`). One TypeScript module is the only database: presence, pins, modules, rover state, team chat, shared concept renders (the pictures live in rows), organisations and per-scene access checked in every reducer.
 
 ## Honest limits
@@ -83,4 +84,4 @@ Scene bundles are not in git (about 50 MB). `pipelines/make_mars_bundle.sh` rebu
 
 Data: NASA/JPL-Caltech Mars 2020 raw images, USGS HiRISE DTM and orthomosaic, CRISM (PDS), Valantinas et al. mineral maps (Zenodo), LOLA, JPL DE421, Hurowitz et al. 2025 (Nature), Matthiä & Berger 2024 (Space Weather).
 
-Built at MHacks by Matus, Claire and Humyra.
+Built at MHacks by Matus, Claire and Humyra. We used Cursor to build it and Grok Bot in our team Slack to plan it and coordinate.
