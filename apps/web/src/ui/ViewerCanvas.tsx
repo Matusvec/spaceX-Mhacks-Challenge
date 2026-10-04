@@ -1,30 +1,24 @@
 import { useEffect, useRef } from "react";
 import { SceneRoot, type HoverInfo } from "../scene/SceneRoot";
-import type { LoadedBundle } from "../scene/loadBundle";
 
 type Props = {
-  bundle: LoadedBundle | null;
+  onReady: (sceneRoot: SceneRoot | null) => void;
   onHover: (info: HoverInfo) => void;
 };
 
-export function ViewerCanvas({ bundle, onHover }: Props) {
+export function ViewerCanvas({ onReady, onHover }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<SceneRoot | null>(null);
   const onHoverRef = useRef(onHover);
   onHoverRef.current = onHover;
 
   useEffect(() => {
     const sceneRoot = new SceneRoot(containerRef.current!, (info) => onHoverRef.current(info));
-    sceneRef.current = sceneRoot;
+    onReady(sceneRoot);
     return () => {
+      onReady(null);
       sceneRoot.dispose();
-      sceneRef.current = null;
     };
-  }, []);
-
-  useEffect(() => {
-    if (bundle) sceneRef.current?.setBundle(bundle);
-  }, [bundle]);
+  }, [onReady]);
 
   return <div className="viewer" ref={containerRef} />;
 }

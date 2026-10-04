@@ -97,6 +97,44 @@ body,
   inset: 0;
 }
 
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+button {
+  padding: 5px 10px;
+  border: 1px solid #2c3240;
+  border-radius: 6px;
+  background: #1a1f29;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #232a37;
+}
+
+progress {
+  width: 100%;
+}
+
+.drop-overlay {
+  position: absolute;
+  inset: 12px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed #4fd1ff;
+  border-radius: 12px;
+  background: rgba(11, 13, 18, 0.7);
+  font-size: 18px;
+  pointer-events: none;
+}
+
 .readout {
   position: absolute;
   left: 16px;

@@ -10,6 +10,7 @@
     "placeholder": "node scripts/make-placeholder-bundle.mjs"
   },
   "dependencies": {
+    "@sparkjsdev/spark": "^2.3.1",
     "fast-png": "^8.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

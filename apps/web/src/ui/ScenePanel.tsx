@@ -5,7 +5,7 @@ export function ScenePanel({ bundle }: { bundle: LoadedBundle }) {
   const [width, depth] = manifest.terrain.size_m;
 
   return (
-    <aside className="panel">
+    <section>
       <p className="eyebrow">{manifest.body === "mars" ? "Mars" : "Moon"}</p>
       <h1>{manifest.title}</h1>
 
@@ -44,6 +44,6 @@ export function ScenePanel({ bundle }: { bundle: LoadedBundle }) {
           </ul>
         </>
       )}
-    </aside>
+    </section>
   );
 }

@@ -3,6 +3,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { encode } from "fast-png";
+import { encode3dgsPly } from "./write-3dgs-ply.mjs";
 
 const SCENE_ID = "placeholder-mars";
 const SIZE_M = 1000;
@@ -46,12 +47,57 @@ for (let i = 0; i < heights.length; i++) {
   pixels[i] = Math.round(((heights[i] - zMin) / (zMax - zMin)) * 65535);
 }
 
+// Seeded random numbers, so every run writes the same file.
+let seed = 42;
+function random() {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+// A fake rock outcrop near the test pin: Gaussians on the surfaces of a few
+// partly buried ellipsoid boulders, in site coordinates on the terrain.
+function makeOutcrop() {
+  const boulders = [
+    { center: [40, 30], radii: [8, 5, 4] },
+    { center: [52, 24], radii: [5, 4, 3] },
+    { center: [33, 40], radii: [3, 3, 2.5] },
+    { center: [47, 40], radii: [6, 3, 2] },
+  ];
+  const gaussians = [];
+  for (const { center, radii } of boulders) {
+    const ground = heightAt(center[0], center[1]);
+    const count = Math.round(1500 * radii[0] * radii[1]);
+    for (let i = 0; i < count; i++) {
+      const u = random() * 2 - 1;
+      const theta = random() * 2 * Math.PI;
+      const r = Math.sqrt(1 - u * u);
+      const normal = [r * Math.cos(theta), r * Math.sin(theta), u];
+      if (normal[2] < -0.3) continue; // buried part
+      const shade = 0.65 + 0.35 * normal[2] + (random() - 0.5) * 0.15;
+      const vein = Math.abs(Math.sin(normal[2] * 9 + normal[0] * 3)) > 0.93 ? 0.25 : 0;
+      gaussians.push({
+        position: [center[0] + normal[0] * radii[0], center[1] + normal[1] * radii[1], ground + normal[2] * radii[2]],
+        color: [0.55, 0.42, 0.33].map((c) => Math.min(1, Math.max(0, c * shade + vein))),
+        alpha: 0.9,
+        sigma: [0.25, 0.25, 0.25],
+        quaternion: [1, 0, 0, 0],
+      });
+    }
+  }
+  return gaussians;
+}
+
+const outcrop = makeOutcrop();
+
 const scene = {
   scene_id: SCENE_ID,
   body: "mars",
   title: "Placeholder terrain (synthetic)",
   site_origin_map: { x: 0, y: 0, z: 0 },
   map_crs: "none, synthetic placeholder",
+  splat: { file: "splat.ply", count: outcrop.length, sh_degree: 0, order_preserved: true },
   terrain: {
     file: "terrain.png",
     size_m: [SIZE_M, SIZE_M],
@@ -60,7 +106,7 @@ const scene = {
     z_max_m: Number(zMax.toFixed(3)),
   },
   pins: "pins.json",
-  sources: [{ name: "Synthetic placeholder terrain, not real data", url: "" }],
+  sources: [{ name: "Synthetic placeholder terrain and splat, not real data", url: "" }],
 };
 
 const pins = [
@@ -79,4 +125,5 @@ mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(OUT_DIR + "terrain.png", encode({ width: PIXELS, height: PIXELS, data: pixels, depth: 16, channels: 1 }));
 writeFileSync(OUT_DIR + "scene.json", JSON.stringify(scene, null, 2));
 writeFileSync(OUT_DIR + "pins.json", JSON.stringify(pins, null, 2));
-console.log(`Wrote ${OUT_DIR} (z ${zMin.toFixed(1)} to ${zMax.toFixed(1)} m)`);
+writeFileSync(OUT_DIR + "splat.ply", encode3dgsPly(outcrop));
+console.log(`Wrote ${OUT_DIR} (z ${zMin.toFixed(1)} to ${zMax.toFixed(1)} m, ${outcrop.length} Gaussians)`);
