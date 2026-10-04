@@ -106,7 +106,17 @@ export function useRover(sceneRoot: SceneRoot | null, analysis: TerrainAnalysis 
     if (remote !== true) syncRef.current?.onReset();
   }, [sceneRoot, analysis]);
 
-  return { position, route, isReachable, planRoute, driveTo, reset, moveTo: setPosition };
+  // Time warp for drives, and the mission time left while one is running.
+  const [timeScale, setTimeScale] = useState(600);
+  const [remainingS, setRemainingS] = useState<number | null>(null);
+  useEffect(() => sceneRoot?.setRoverTimeScale(timeScale), [sceneRoot, timeScale]);
+  useEffect(() => {
+    if (!sceneRoot) return;
+    const timer = window.setInterval(() => setRemainingS(sceneRoot.roverRemainingS()), 200);
+    return () => window.clearInterval(timer);
+  }, [sceneRoot]);
+
+  return { position, route, isReachable, planRoute, driveTo, reset, moveTo: setPosition, timeScale, setTimeScale, remainingS };
 }
 
 export type Rover = ReturnType<typeof useRover>;

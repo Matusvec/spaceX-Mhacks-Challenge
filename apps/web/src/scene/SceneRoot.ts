@@ -84,6 +84,7 @@ export class SceneRoot {
   private rover: RoverModel | null = null;
   private driveHandler: ((x: number, y: number) => void) | null = null;
   private lastFrameMs = 0;
+  private roverTimeScale = 600;
   private readonly rig: CameraRig;
   private pathMesh: THREE.Mesh | null = null;
   private drive: RoverDrive | null = null;
@@ -345,6 +346,17 @@ export class SceneRoot {
     if (!this.drive) poseRover(this.rover, this.heightAt, position.x, position.y, this.rover.group.rotation.z);
   }
 
+  // Mission seconds per real second for rover drives (1 = real time).
+  setRoverTimeScale(scale: number): void {
+    this.roverTimeScale = scale;
+    if (this.drive) this.drive.timeScale = scale;
+  }
+
+  // Mission seconds until the rover arrives, or null when it is not driving.
+  roverRemainingS(): number | null {
+    return this.drive ? this.drive.remainingS() : null;
+  }
+
   setCameraMode(mode: CameraMode): void {
     this.rig.setMode(mode);
   }
@@ -370,6 +382,7 @@ export class SceneRoot {
   driveRover(points: PathPoint[], onDone: () => void): void {
     if (!this.rover || points.length < 2) return onDone();
     this.drive = new RoverDrive(this.rover, this.heightAt, points, onDone);
+    this.drive.timeScale = this.roverTimeScale;
   }
 
   flyToSite(x: number, y: number, z: number, distanceM: number): void {

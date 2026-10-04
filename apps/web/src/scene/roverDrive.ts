@@ -4,17 +4,16 @@ import { ROCKER_PIVOT, TRACK_HALF_M, WHEELBASE_M, WHEEL_RADIUS_M, type RoverMode
 // Ground height at site (x, y), or null where there is no terrain.
 export type HeightAt = (x: number, y: number) => number | null;
 
-const TURN_RAD_PER_S = 0.9;
-const STEER_RAD_PER_S = 2.5;
-// Playback speed: short hops are slow enough to watch the wheels, long routes are sped up.
-const MIN_SPEED_M_PER_S = 1.2;
-const MAX_SPEED_M_PER_S = 40;
-const TARGET_DRIVE_S = 10;
+// Perseverance's top speed on flat, hard ground is 4.2 cm/s (152 m per hour, NASA). A turn on the spot
+// moves the corner wheels at that same speed around the rover's centre, which sets the turn rate.
+export const ROVER_SPEED_M_PER_S = 0.042;
+const CORNER_WHEEL_M = 1.6; // corner wheel to the rover's centre
+export const ROVER_TURN_RAD_PER_S = ROVER_SPEED_M_PER_S / CORNER_WHEEL_M;
+const STEER_RAD_PER_S = 0.3; // per second of mission time
 const LINK_AXIS = new THREE.Vector3(0, 1, 0);
 const a = new THREE.Vector3();
 const b = new THREE.Vector3();
 
-const ease = (t: number) => t * t * (3 - 2 * t);
 const wrap = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
 
 // A smooth line through route points; the drive and the drawn path both follow it.
@@ -67,13 +66,11 @@ export function poseRover(model: RoverModel, heightAt: HeightAt, x: number, y: n
 // Drives the rover along a route: it turns on the spot to face the route, then follows it.
 // Each wheel steers and rolls according to how the ground moves under that wheel.
 export class RoverDrive {
+  // Mission seconds simulated per real second: 1 is real time, 600 turns ten minutes into one second.
+  timeScale = 600;
   private readonly curve: THREE.CatmullRomCurve3;
   private readonly total: number;
-  private readonly turnFrom: number;
-  private readonly turnBy: number;
-  private readonly turnMs: number;
-  private readonly driveMs: number;
-  private elapsedMs = 0;
+  private turnLeft: number;
   private along = 0;
   private x: number;
   private y: number;
@@ -88,36 +85,55 @@ export class RoverDrive {
     this.curve = routeCurve(points);
     this.total = this.curve.getLength();
     [this.x, this.y] = points[0];
-    this.yaw = this.turnFrom = model.group.rotation.z;
+    this.yaw = model.group.rotation.z;
     const tangent = this.curve.getTangentAt(0);
-    this.turnBy = this.total > 0.05 ? wrap(Math.atan2(tangent.y, tangent.x) - this.yaw) : 0;
-    this.turnMs = (Math.abs(this.turnBy) / TURN_RAD_PER_S) * 1000;
-    const speed = Math.min(MAX_SPEED_M_PER_S, Math.max(MIN_SPEED_M_PER_S, this.total / TARGET_DRIVE_S));
-    this.driveMs = Math.max(1500, (this.total / speed) * 1000);
+    this.turnLeft = this.total > 0.05 ? wrap(Math.atan2(tangent.y, tangent.x) - this.yaw) : 0;
   }
 
-  // Advances by dtMs; returns true once the rover has arrived.
+  // Mission time still needed, in seconds: the turn on the spot, then the drive at the rover's real speed.
+  remainingS(): number {
+    return Math.abs(this.turnLeft) / ROVER_TURN_RAD_PER_S + (this.total - this.along) / ROVER_SPEED_M_PER_S;
+  }
+
+  // Advances by dtMs of real time; returns true once the rover has arrived.
   update(dtMs: number): boolean {
-    this.elapsedMs += dtMs;
+    let missionS = (dtMs / 1000) * this.timeScale;
+    const simulated = missionS;
     let moved = 0;
     let yaw = this.yaw;
-    if (this.elapsedMs < this.turnMs) {
-      yaw = this.turnFrom + this.turnBy * ease(this.elapsedMs / this.turnMs);
-    } else {
-      const u = ease(Math.min(1, (this.elapsedMs - this.turnMs) / this.driveMs));
-      const point = this.curve.getPointAt(u);
-      const tangent = this.curve.getTangentAt(u);
-      [this.x, this.y] = [point.x, point.y];
-      yaw = Math.atan2(tangent.y, tangent.x);
-      moved = u * this.total - this.along;
-      this.along = u * this.total;
+    if (this.turnLeft !== 0) {
+      const step = Math.min(Math.abs(this.turnLeft), ROVER_TURN_RAD_PER_S * missionS);
+      yaw += Math.sign(this.turnLeft) * step;
+      this.turnLeft = Math.abs(this.turnLeft) - step < 1e-6 ? 0 : this.turnLeft - Math.sign(this.turnLeft) * step;
+      missionS -= step / ROVER_TURN_RAD_PER_S;
     }
-    this.rollWheels(moved, wrap(yaw - this.yaw), dtMs / 1000);
+    if (this.turnLeft === 0 && missionS > 0) {
+      // Drive at the real speed, slowing on bends so the heading never changes faster than the rover can turn.
+      let ahead = Math.min(this.total - this.along, ROVER_SPEED_M_PER_S * missionS);
+      let heading = this.headingAt(this.along + ahead);
+      const bend = Math.abs(wrap(heading - yaw));
+      const allowed = ROVER_TURN_RAD_PER_S * 4 * missionS; // an arc turn is easier than a turn on the spot
+      if (bend > allowed && ahead > 1e-4) {
+        ahead *= allowed / bend;
+        heading = this.headingAt(this.along + ahead);
+      }
+      this.along += ahead;
+      moved = ahead;
+      const point = this.curve.getPointAt(Math.min(1, this.along / this.total));
+      [this.x, this.y] = [point.x, point.y];
+      yaw = heading;
+    }
+    this.rollWheels(moved, wrap(yaw - this.yaw), simulated);
     this.yaw = yaw;
     poseRover(this.model, this.heightAt, this.x, this.y, yaw);
-    const done = this.elapsedMs >= this.turnMs + this.driveMs;
+    const done = this.turnLeft === 0 && this.total - this.along < 1e-3;
     if (done) this.onDone();
     return done;
+  }
+
+  private headingAt(along: number): number {
+    const tangent = this.curve.getTangentAt(Math.min(1, Math.max(0, along / this.total)));
+    return Math.atan2(tangent.y, tangent.x);
   }
 
   // The ground under a wheel at (x, y) moves by (moved - turned * y, turned * x) in the rover's frame.
