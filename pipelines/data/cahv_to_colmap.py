@@ -3,14 +3,17 @@
 
   python pipelines/data/cahv_to_colmap.py data/raw/cheyava_s56d0 data/colmap/cheyava_s56d0
 
-Writes <out>/images/ (symlinks) and <out>/sparse/0/{cameras,images,points3D}.txt, ready for
-feature matching + point_triangulator (docs/splat-pipeline.md steps 2-3, route A).
+Writes the frames a Gaussian splat can actually use: debayered color, zoomed on
+the ground in front of the rover, one image per aim. Symlinks plus
+<out>/sparse/0/{cameras,images,points3D}.txt, ready for feature matching +
+point_triangulator (docs/splat-pipeline.md steps 2-3, route A).
 """
 import json
 import sys
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 from scipy.spatial.transform import Rotation
 
 
@@ -36,34 +39,117 @@ def parse_model(rec):
     return [np.array([float(v) for v in p.strip("()").split(",")]) for p in parts]
 
 
-def usable(rec):
-    """Skip narrowband and solar (ND) filter frames; they don't match the RGB frames."""
+def product_kind(imageid):
+    for k in ("EBY", "ECM", "ECZ", "ECV", "ECR", "ECS"):
+        if k in imageid:
+            return k
+    return ""
+
+
+def color_frame(rec):
+    """Browse PNG that is actually color, and broadband.
+
+    Analyst's Notebook: EBY is de-Bayered, ECM is the original product.
+    Mastcam-Z ECM browse PNGs are grayscale (R=G=B); DOM reconstructions use EBY.
+    Navcam ECM browse PNGs are already color. Narrowband and ND filters do not
+    match the RGB frames, so they stay out.
+    """
     f = rec["camera"]["filter_name"]
-    return rec["camera"]["camera_model_type"].startswith("CAHV") and (f == "UNK" or f.endswith("_RGB"))
+    if "ND" in f or not rec["camera"]["camera_model_type"].startswith("CAHV"):
+        return False
+    kind = product_kind(rec["imageid"])
+    inst = rec["camera"]["instrument"]
+    if inst.startswith("MCZ"):
+        return kind == "EBY" and f.endswith("_RGB")
+    if inst.startswith("NAVCAM"):
+        return kind == "ECM" and f == "UNK"
+    return False
+
+
+def ground_hit(C, A):
+    """Boresight intersection with the ground plane z=0. Rover frame, +Z down."""
+    A = A / np.linalg.norm(A)
+    if A[2] <= 0.05:
+        return None
+    t = -float(C[2]) / float(A[2])
+    if t <= 0:
+        return None
+    return float(C[0] + t * A[0]), float(C[1] + t * A[1]), t
+
+
+def for_splat(rec):
+    """Zoomed color view of the ground in front of the rover.
+
+    This stop never drove, so the only parallax is the Mastcam-Z stereo baseline
+    plus a few centimetres of mast motion. Keep both eyes of the ~110 mm
+    workspace raster. Drop horizon frames, the backward look, and Navcam:
+    those tiles are one pose chopped up, the public PNGs are stretched per tile,
+    and the down-looking ones are full of the rover arm.
+    """
+    if not rec["camera"]["instrument"].startswith("MCZ") or not color_frame(rec):
+        return False
+    C, A, H, V = parse_model(rec)
+    fx = float(np.linalg.norm(np.cross(A / np.linalg.norm(A), H)))
+    if fx < 10000 or float(rec["extended"]["mastEl"]) > -28:
+        return False
+    hit = ground_hit(C, A)
+    return hit is not None and hit[0] > 0.8 and hit[2] < 5.5
+
+
+def sharpness(path):
+    im = np.asarray(Image.open(path).convert("L"), dtype=np.float32)[::4, ::4]
+    lap = im[:-2, 1:-1] + im[2:, 1:-1] + im[1:-1, :-2] + im[1:-1, 2:] - 4 * im[1:-1, 1:-1]
+    return float(lap.var())
+
+
+def dedup(recs, raw):
+    """Same aim across sols and focus pairs: keep the sharpest frame."""
+    groups = {}
+    for r in recs:
+        C, A, H, V = parse_model(r)
+        fx = float(np.linalg.norm(np.cross(A / np.linalg.norm(A), H)))
+        az, el = float(r["extended"]["mastAz"]), float(r["extended"]["mastEl"])
+        key = (r["camera"]["instrument"], round(az * 2) / 2, round(el * 2) / 2, round(fx / 500))
+        groups.setdefault(key, []).append(r)
+    kept = []
+    for group in groups.values():
+        if len(group) == 1:
+            kept.append(group[0])
+        else:
+            kept.append(max(group, key=lambda r: sharpness(raw / f"{r['imageid']}.png")))
+    return kept
 
 
 def main(raw, out):
     raw, out = Path(raw), Path(out)
-    (out / "images").mkdir(parents=True, exist_ok=True)
+    img_dir = out / "images"
+    img_dir.mkdir(parents=True, exist_ok=True)
     (out / "sparse/0").mkdir(parents=True, exist_ok=True)
-    recs = [json.loads(p.read_text()) for p in sorted(raw.glob("*.json"))]
-    recs = [r for r in recs if usable(r) and (raw / f"{r['imageid']}.png").exists()]
+    all_recs = [json.loads(p.read_text()) for p in sorted(raw.glob("*.json"))]
+    present = [r for r in all_recs if (raw / f"{r['imageid']}.png").exists()]
+    aimed = [r for r in present if for_splat(r)]
+    recs = dedup(aimed, raw)
 
     # ponytail: assumes one site/drive, so every model shares one rover frame. Mixing drives
     # needs each drive moved into a common frame first (rover attitude + PLACES), or route B.
     stops = {(r["site"], r["drive"]) for r in recs}
     if len(stops) > 1:
         print(f"WARNING: {len(stops)} site/drive stops mixed {sorted(stops)}; poses will not line up")
+    print(f"kept {len(recs)} of {len(present)}  (zoomed color views of the ground ahead, duplicates dropped)")
+
+    for stale in img_dir.iterdir():
+        if stale.name not in {f"{r['imageid']}.png" for r in recs}:
+            stale.unlink()
 
     cams, imgs, worst = [], [], 0.0
-    for i, r in enumerate(recs, 1):
+    for i, r in enumerate(sorted(recs, key=lambda r: r["imageid"]), 1):
         (fx, fy, cx, cy), R, t, err = cahv_to_pinhole(*parse_model(r))
         worst = max(worst, err)
         # The feed's models are already in the pixel grid of the delivered tile (principal point
         # can sit far off-centre or outside the tile), so no scaleFactor/subframeRect fixup here.
         w, h = (int(v) for v in r["extended"]["dimension"].strip("()").split(","))
         name = f"{r['imageid']}.png"
-        link = out / "images" / name
+        link = img_dir / name
         if not link.exists():
             link.symlink_to((raw / name).resolve())
         qx, qy, qz, qw = Rotation.from_matrix(R).as_quat()

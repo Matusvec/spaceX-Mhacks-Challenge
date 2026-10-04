@@ -91,7 +91,10 @@ def main():
         "site_origin_map": {"x": x, "y": y, "z": z0},
         "map_crs": "Mars equirectangular (lat_ts=0, lon_0=0, sphere R=3396190 m), USGS Mars 2020 TRN HiRISE DTM; "
                    "z is metres above the MOLA geoid",
-        "terrain": {"file": "terrain.png", "texture": "terrain_texture.jpg", "size_m": [float(SIZE_M)] * 2,
+        # The window is SIZE_M map units square, and the map is equirectangular with its standard
+        # parallel at the equator: at this latitude one map unit east is only cos(lat) real metres.
+        "terrain": {"file": "terrain.png", "texture": "terrain_texture.jpg",
+                    "size_m": [round(SIZE_M * math.cos(math.radians(LAT)), 2), float(SIZE_M)],
                     "resolution_m": 1.0, "z_min_m": round(z_min, 3), "z_max_m": round(z_max, 3)},
         "pins": "pins.json",
         "sources": [

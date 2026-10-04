@@ -9,6 +9,8 @@ dist/
 scenes/*
 !scenes/.gitkeep
 /data/
+# training outputs pulled from Colab, model checkpoints, lifted layers (1 GB and growing)
+/runs/
 third_party/
 *.pt
 *.ply
