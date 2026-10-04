@@ -8,7 +8,7 @@ dist/
 # large data lives on Drive / local disk, never in git
 scenes/*
 !scenes/.gitkeep
-data/
+/data/
 third_party/
 *.pt
 *.ply
