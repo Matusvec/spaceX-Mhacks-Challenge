@@ -41,6 +41,19 @@ export type Score = {
   notes: string[];
 };
 
+// Section 9. `drive` on show_path is a proposed addition: plan the route and also drive it.
+export type Intent =
+  | {
+      intent: "find_sites";
+      args: { max_slope_deg?: number; near_pin?: string; within_m?: number; terrain_class?: string; min_carbonate?: number };
+    }
+  | { intent: "place_module"; args: { type: ModuleType; at: string } }
+  | { intent: "show_path"; args: { from: string; to: string; drive?: boolean } }
+  | { intent: "query_scene"; args: { text: string } }
+  | { intent: "render_concept"; args: Record<string, never> }
+  | { intent: "toggle_layer"; args: { layer: string; on: boolean } }
+  | { intent: "compare_sites"; args: { a: number; b: number } };
+
 export type SciencePin = {
   id: number;
   name: string;

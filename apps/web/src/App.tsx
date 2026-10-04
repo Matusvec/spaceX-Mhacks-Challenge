@@ -4,6 +4,7 @@ import { bundleFileUrl, loadBundle, type LoadedBundle } from "./scene/loadBundle
 import { isSplatFileName, SPLAT_EXTENSIONS } from "./scene/splat";
 import { MODULE_LABELS } from "./config/scoring";
 import { BasecampPanel } from "./ui/BasecampPanel";
+import { RoverChat } from "./ui/RoverChat";
 import { RoverPanel } from "./ui/RoverPanel";
 import { ScenePanel } from "./ui/ScenePanel";
 import { useBasecamp } from "./ui/useBasecamp";
@@ -110,6 +111,17 @@ export function App() {
             x {hover.x.toFixed(1)} m E · y {hover.y.toFixed(1)} m N · elevation {hover.z.toFixed(2)} m
           </div>
         )}
+        <RoverChat
+          context={
+            displayedBundle && {
+              manifest: displayedBundle.manifest,
+              pins: displayedBundle.pins,
+              rover,
+              basecamp,
+              selectedTarget,
+            }
+          }
+        />
         {dragging && <div className="drop-overlay">Drop a {SPLAT_EXTENSIONS.join(" / ")} splat to preview it</div>}
       </main>
       <aside className="panel panel-right">

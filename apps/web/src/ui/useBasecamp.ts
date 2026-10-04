@@ -65,6 +65,17 @@ export function useBasecamp(
     setPlacement((current) => current && { ...current, type });
   };
 
+  const evaluateAt = (x: number, y: number) =>
+    ctx ? evaluateSite({ type: moduleType, x, y, rotationZDeg: 0 }, ctx).score : null;
+
+  const findSites = (count: number) => (grid && ctx ? findTopSites(grid, count, siteSeparationM(moduleType, ctx)) : []);
+
+  const placeAt = (type: ModuleType, x: number, y: number) => {
+    setModuleTypeState(type);
+    setPlacement({ type, x, y, rotationZDeg: 0 });
+    return ctx ? evaluateSite({ type, x, y, rotationZDeg: 0 }, ctx).score : null;
+  };
+
   const goToSite = (site: CandidateSite) => {
     setPlacement({ type: moduleType, x: site.x, y: site.y, rotationZDeg: 0 });
     const z = analysis ? (sampleHeight(analysis.heightfield, site.x, site.y) ?? 0) : 0;
@@ -82,6 +93,9 @@ export function useBasecamp(
     placement,
     evaluation,
     goToSite,
+    evaluateAt,
+    findSites,
+    placeAt,
     rotate,
     removeModule: () => setPlacement(null),
     resolutionM: analysis?.resolutionM ?? null,
