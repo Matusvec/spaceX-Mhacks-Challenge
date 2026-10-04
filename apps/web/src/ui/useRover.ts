@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findRoverPath, reachableFrom, type RoverPath } from "../paths/astar";
 import { gridIndexAt } from "../paths/roverGrid";
 import { sampleHeight } from "../scene/heightfield";
@@ -13,7 +13,16 @@ export type RouteState = {
   status: "planned" | "blocked" | "driving" | "arrived";
 };
 
-export function useRover(sceneRoot: SceneRoot | null, analysis: TerrainAnalysis | null) {
+// Multiplayer (src/multiplayer): told about this user's own drives and resets so the other clients can follow.
+export type RoverSync = {
+  onDrive(from: { x: number; y: number }, target: RouteTarget): void;
+  onArrive(): void;
+  onReset(): void;
+};
+
+export function useRover(sceneRoot: SceneRoot | null, analysis: TerrainAnalysis | null, sync?: RoverSync) {
+  const syncRef = useRef(sync);
+  syncRef.current = sync;
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [route, setRoute] = useState<RouteState | null>(null);
 
@@ -38,17 +47,25 @@ export function useRover(sceneRoot: SceneRoot | null, analysis: TerrainAnalysis 
 
   useEffect(() => {
     if (!sceneRoot) return;
-    const z = position && analysis ? (sampleHeight(analysis.heightfield, position.x, position.y) ?? 0) : 0;
-    sceneRoot.setRover(position && { ...position, z });
+    sceneRoot.setRover(analysis ? position : null);
   }, [sceneRoot, analysis, position]);
 
   const path = route?.path ?? null;
   useEffect(() => sceneRoot?.setPath(path?.points ?? null), [sceneRoot, path]);
 
   const planRoute = useCallback(
-    (target: RouteTarget): RouteState | null => {
-      if (!analysis || !position) return null;
+    (target: RouteTarget, from = position): RouteState | null => {
+      if (!analysis || !from) return null;
+      const position = from;
       const found = findRoverPath(analysis.roverGrid, position.x, position.y, target.x, target.y);
+      if (found) {
+        // The planner works on grid cells; start and end on the exact points, not the cell centres.
+        const z = (x: number, y: number) => sampleHeight(analysis.heightfield, x, y) ?? 0;
+        if (found.points.length < 2) found.points.push(found.points[0]);
+        found.points[0] = [position.x, position.y, z(position.x, position.y)];
+        found.points[found.points.length - 1] = [target.x, target.y, z(target.x, target.y)];
+        found.lengthM = found.points.reduce((sum, p, i, all) => (i ? sum + Math.hypot(p[0] - all[i - 1][0], p[1] - all[i - 1][1], p[2] - all[i - 1][2]) : 0), 0);
+      }
       const next: RouteState = { target, path: found, status: found ? "planned" : "blocked" };
       setRoute(next);
       return next;
@@ -57,28 +74,39 @@ export function useRover(sceneRoot: SceneRoot | null, analysis: TerrainAnalysis 
   );
 
   const driveTo = useCallback(
-    (target: RouteTarget): RouteState | null => {
-      const planned = planRoute(target);
+    // `remoteFrom` is set when replaying a drive another client started: start there and do not re-announce it.
+    (target: RouteTarget, remoteFrom?: { x: number; y: number }): RouteState | null => {
+      const planned = planRoute(target, remoteFrom ?? position);
       if (!planned?.path || !sceneRoot) return planned;
       const { points } = planned.path;
       setRoute({ ...planned, status: "driving" });
+      if (!remoteFrom && position) syncRef.current?.onDrive(position, target);
       sceneRoot.driveRover(points, () => {
         const [x, y] = points[points.length - 1];
         setPosition({ x, y });
         setRoute((current) => current && { ...current, status: "arrived" });
+        syncRef.current?.onArrive();
       });
       return planned;
     },
-    [planRoute, sceneRoot],
+    [planRoute, sceneRoot, position],
   );
 
-  const reset = useCallback(() => {
+  useEffect(() => {
+    if (!sceneRoot) return;
+    sceneRoot.setDriveHandler((x, y) => void driveTo({ x, y, label: `(${x.toFixed(1)}, ${y.toFixed(1)}) m` }));
+    return () => sceneRoot.setDriveHandler(null);
+  }, [sceneRoot, driveTo]);
+
+  // `remote === true` when another client reset the rover (buttons pass a click event, which is not).
+  const reset = useCallback((remote?: unknown) => {
     sceneRoot?.setRover(null);
     setRoute(null);
     setPosition(analysis ? { x: 0, y: 0 } : null);
+    if (remote !== true) syncRef.current?.onReset();
   }, [sceneRoot, analysis]);
 
-  return { position, route, isReachable, planRoute, driveTo, reset };
+  return { position, route, isReachable, planRoute, driveTo, reset, moveTo: setPosition };
 }
 
 export type Rover = ReturnType<typeof useRover>;

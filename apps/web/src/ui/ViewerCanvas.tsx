@@ -14,6 +14,8 @@ export function ViewerCanvas({ onReady, onHover }: Props) {
   useEffect(() => {
     const sceneRoot = new SceneRoot(containerRef.current!, (info) => onHoverRef.current(info));
     onReady(sceneRoot);
+    // Dev-only handle for screenshot scripts (shots/capture.mjs): window.__sceneRoot.setViewSite(eye, target).
+    if (import.meta.env.DEV) (window as unknown as { __sceneRoot?: SceneRoot }).__sceneRoot = sceneRoot;
     return () => {
       onReady(null);
       sceneRoot.dispose();

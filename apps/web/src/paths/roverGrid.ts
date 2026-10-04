@@ -6,7 +6,9 @@ import { cellSizeM, type Heightfield } from "../scene/heightfield";
 export type RoverGrid = {
   cols: number;
   rows: number;
+  // Cell size east-west and north-south: the terrain is not always square (Mars is 1896.68 x 2000 m).
   cellM: number;
+  cellYM: number;
   width: number;
   depth: number;
   heights: Float32Array;
@@ -40,13 +42,14 @@ export function buildRoverGrid(field: Heightfield, fineSlopeDeg: Float32Array, b
       passable[i] = steepest <= SCORING.roverSlopeLimitDeg ? 1 : 0;
     }
   }
-  const cellM = factor * cellSizeM(field);
-  return { cols, rows, cellM, width: field.sizeM[0], depth: field.sizeM[1], heights, slopeDeg, passable };
+  const cellM = (factor * field.sizeM[0]) / (field.cols - 1);
+  const cellYM = (factor * field.sizeM[1]) / (field.rows - 1);
+  return { cols, rows, cellM, cellYM, width: field.sizeM[0], depth: field.sizeM[1], heights, slopeDeg, passable };
 }
 
 export function gridIndexAt(grid: RoverGrid, x: number, y: number): number {
   const col = Math.round((x + grid.width / 2) / grid.cellM);
-  const row = Math.round((grid.depth / 2 - y) / grid.cellM);
+  const row = Math.round((grid.depth / 2 - y) / grid.cellYM);
   if (col < 0 || row < 0 || col >= grid.cols || row >= grid.rows) return -1;
   return row * grid.cols + col;
 }
@@ -54,5 +57,5 @@ export function gridIndexAt(grid: RoverGrid, x: number, y: number): number {
 export function gridPoint(grid: RoverGrid, index: number): [number, number, number] {
   const col = index % grid.cols;
   const row = Math.floor(index / grid.cols);
-  return [-grid.width / 2 + col * grid.cellM, grid.depth / 2 - row * grid.cellM, grid.heights[index]];
+  return [-grid.width / 2 + col * grid.cellM, grid.depth / 2 - row * grid.cellYM, grid.heights[index]];
 }

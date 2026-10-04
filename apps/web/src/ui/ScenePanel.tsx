@@ -1,6 +1,13 @@
 import type { LoadedBundle } from "../scene/loadBundle";
 
-export function ScenePanel({ bundle }: { bundle: LoadedBundle }) {
+type Props = {
+  bundle: LoadedBundle;
+  presentation: boolean;
+  onPresentation: (on: boolean) => void;
+  onDrive?: (target: { x: number; y: number; label: string }) => void;
+};
+
+export function ScenePanel({ bundle, presentation, onPresentation, onDrive }: Props) {
   const { manifest, pins } = bundle;
   const [width, depth] = manifest.terrain.size_m;
 
@@ -23,12 +30,16 @@ export function ScenePanel({ bundle }: { bundle: LoadedBundle }) {
         </dd>
       </dl>
 
-      <h2>Sources</h2>
-      <ul>
-        {manifest.sources.map((source) => (
-          <li key={source.name}>{source.url ? <a href={source.url}>{source.name}</a> : source.name}</li>
-        ))}
-      </ul>
+      <h2>Presentation</h2>
+      <label className="checkbox">
+        <input type="checkbox" checked={presentation} onChange={(e) => onPresentation(e.target.checked)} />
+        Presentation fill
+      </label>
+      <p className="muted small">
+        Real: {manifest.splat ? "splat (rover photos), " : ""}terrain and image (orbit). Cosmetic: sky
+        {manifest.body === "mars" ? ", haze" : ""}, ground beyond the window{manifest.splat ? ", soft splat edge" : ""}, fine
+        grain. Off shows only the data.
+      </p>
 
       {pins.length > 0 && (
         <>
@@ -37,8 +48,35 @@ export function ScenePanel({ bundle }: { bundle: LoadedBundle }) {
             {pins.map((pin) => (
               <li key={pin.id}>
                 <strong>{pin.name}</strong>
+                {onDrive && (
+                  <>
+                    {" "}
+                    <button className="link" onClick={() => onDrive({ x: pin.position_site[0], y: pin.position_site[1], label: pin.name })}>
+                      Drive here
+                    </button>
+                  </>
+                )}
                 <br />
                 <span className="muted">{pin.summary}</span>
+                {pin.sample && (
+                  <div className="small">
+                    Sample: {pin.sample.name} (no. {pin.sample.number})
+                  </div>
+                )}
+                {pin.measurements.length > 0 && (
+                  <details className="small">
+                    <summary>{pin.measurements.length} cited measurements</summary>
+                    <ul>
+                      {pin.measurements.map((m) => (
+                        <li key={m.label}>
+                          <strong>{m.label}</strong>
+                          <br />
+                          {m.value}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </li>
             ))}
           </ul>

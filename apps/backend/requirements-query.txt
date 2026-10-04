@@ -1,0 +1,9 @@
+# Optional: needed only for POST /query (text search over the splat). Without these the server
+# still starts and /query answers 503. Install torch and torchvision from the same PyTorch index:
+#   CPU (enough here):  uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   RTX 5070:           uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# then:                 uv pip install -r requirements-query.txt
+torch>=2.6
+torchvision
+open_clip_torch>=3.0
+numpy>=2.0

@@ -1,0 +1,17 @@
+{
+  "name": "pss-spacetime-module",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "spacetime build --module-path .",
+    "publish:local": "spacetime publish pss-studio --server local --module-path . --yes",
+    "generate": "spacetime generate --lang typescript --module-path . --out-dir ../apps/web/src/multiplayer/module_bindings --yes"
+  },
+  "dependencies": {
+    "spacetimedb": "2.10.*"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2"
+  }
+}

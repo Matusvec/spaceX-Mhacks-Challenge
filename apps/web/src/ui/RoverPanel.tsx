@@ -15,6 +15,8 @@ export function RoverPanel({ rover, selectedTarget }: Props) {
       {position && (
         <p className="muted small">
           At ({position.x.toFixed(0)}, {position.y.toFixed(0)}) m. Avoids slopes over {SCORING.roverSlopeLimitDeg}°.
+          <br />
+          Double-click anywhere on the terrain to send the rover there.
         </p>
       )}
 

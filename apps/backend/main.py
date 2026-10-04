@@ -1,13 +1,16 @@
 """FastAPI service: keeps API keys off the browser and serves scene bundles (docs/backend.md)."""
 
-import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+import intents
+import render
 import settings
-from intents import text_to_intent
+import voice
+import xai
+from query import QueryUnavailable, query_scene
 
 app = FastAPI(title="Planetary Scene Studio backend")
 app.add_middleware(
@@ -18,31 +21,50 @@ app.add_middleware(
 )
 
 
-class IntentContext(BaseModel):
-    selected_module_id: int | None = None
-    pins: list[str] = []
-
-
-class IntentRequest(BaseModel):
-    text: str
-    scene_id: str
-    context: IntentContext = IntentContext()
+app.include_router(intents.router)  # POST /intent (Grok text)
+app.include_router(render.router)  # POST /concept, GET /concepts (Grok Imagine)
+app.include_router(voice.router)  # POST /voice/transcribe, POST /voice/speak (Grok Voice)
 
 
 @app.get("/health")
-def health():
-    return {"ok": True, "grok_configured": bool(settings.XAI_API_KEY), "scenes_dir": str(settings.SCENES_DIR)}
+def health(x_team_code: str | None = Header(None)):
+    return {
+        "ok": True,
+        "grok_configured": bool(settings.XAI_API_KEY),
+        "team_code_required": bool(settings.TEAM_CODE),
+        "team_code_ok": xai.team_code_ok(x_team_code),
+        "text_model": settings.XAI_TEXT_MODEL,
+        "image_model": settings.XAI_IMAGE_MODEL,
+        "scenes_dir": str(settings.SCENES_DIR),
+    }
 
 
-@app.post("/intent")
-async def intent(request: IntentRequest):
-    if not settings.XAI_API_KEY:
-        raise HTTPException(503, "XAI_API_KEY is not set in apps/backend/.env")
+
+class QueryRequest(BaseModel):
+    scene_id: str
+    text: str = Field(min_length=1, max_length=200)
+
+
+@app.post("/query")
+def query(request: QueryRequest):
+    # A plain def: FastAPI runs it in a worker thread, so the first call (loading CLIP) does not block the server.
     try:
-        return await text_to_intent(request.text, request.context.pins)
-    except httpx.HTTPError as err:
-        raise HTTPException(502, f"Grok request failed: {err}") from err
+        return query_scene(request.scene_id, request.text.strip())
+    except QueryUnavailable as err:
+        raise HTTPException(503, str(err)) from err
+    except FileNotFoundError as err:
+        raise HTTPException(404, f"no clusters for this scene: {err}") from err
+
+
+class SceneFiles(StaticFiles):
+    """Bundles are re-exported in place, so browsers must revalidate (ETag) and not trust their cache."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 if settings.SCENES_DIR.is_dir():
-    app.mount("/scenes", StaticFiles(directory=settings.SCENES_DIR), name="scenes")
+    app.mount("/scenes", SceneFiles(directory=settings.SCENES_DIR), name="scenes")
+app.mount("/renders", StaticFiles(directory=settings.RENDERS_DIR), name="renders")  # saved concept renders

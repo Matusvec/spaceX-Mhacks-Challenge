@@ -1,0 +1,5 @@
+# The deployed function (app.py = apps/backend/vercel_app.py). No torch, no uvicorn: Vercel runs the ASGI app itself.
+fastapi>=0.115
+httpx>=0.27
+pydantic>=2.8
+python-dotenv>=1.0

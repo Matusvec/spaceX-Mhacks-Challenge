@@ -183,7 +183,7 @@ Grok (voice or text) maps a request to exactly one of these. The web app and the
 { "intent": "place_module", "args": { "type": "habitat", "at": "selected_site" } }
 { "intent": "show_path",    "args": { "from": "rover", "to": "selected_site" } }
 { "intent": "query_scene",  "args": { "text": "veined light-toned rock" } }
-{ "intent": "render_concept", "args": {} }
+{ "intent": "render_concept", "args": { "idea": "three domes linked by tunnels" } }
 { "intent": "toggle_layer", "args": { "layer": "slope_deg", "on": true } }
 { "intent": "compare_sites", "args": { "a": 12, "b": 15 } }
 ```
@@ -196,5 +196,8 @@ Full detail in `docs/backend.md`. Base URL from `VITE_BACKEND_URL`.
 |---|---|---|---|
 | POST | `/intent` | `{ text, scene_id, context }` | one intent object (section 9) |
 | POST | `/query` | `{ scene_id, text?, filters? }` | `{ cluster_ids, gaussian_mask_rle?, explanation }` |
-| POST | `/render` | `{ image_base64, prompt }` | `{ image_url }` |
+| POST | `/concept` | `{ scene_id, prompt?, image?, modules? }` | `{ id, image_url, view_url, prompt, mode, model, note }` (Grok Imagine) |
+| GET | `/concepts?scene_id=` | | the last eight concept renders, newest first |
+| POST | `/voice/transcribe` | recorded audio (raw body) | `{ text }` (Grok Voice) |
+| POST | `/voice/speak` | `{ text }` | MP3 audio (Grok Voice) |
 | GET | `/scenes/{scene_id}/{file}` | | static bundle files |

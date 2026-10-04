@@ -1,8 +1,11 @@
+import type { Concept } from "../concept/useConcept";
 import { MODULE_LABELS, SCORING } from "../config/scoring";
 import type { Intent, SceneManifest, SciencePin } from "../contracts";
 import type { CandidateSite } from "../modules/siteSearch";
+import { addPinFromChat, findUserPin, type UserPinContext } from "../multiplayer/pinChat";
 import type { Basecamp } from "../ui/useBasecamp";
 import type { RouteTarget, Rover } from "../ui/useRover";
+import { interpretLocally } from "./localInterpreter";
 
 export type ChatReply = { text: string; sources?: { label: string; url: string }[] };
 
@@ -12,6 +15,9 @@ export type ExecuteContext = {
   rover: Rover;
   basecamp: Basecamp;
   selectedTarget: RouteTarget | null;
+  // User pins (people's notes, shared through Spacetime); never mixed into the science `pins`.
+  userPins?: UserPinContext;
+  concept: Concept;
 };
 
 export const HELP_TEXT = [
@@ -20,6 +26,8 @@ export const HELP_TEXT = [
   "• Is site 2 reachable?",
   "• Drive to site 1",
   "• Go home",
+  "• Add a pin here as sample spot",
+  "• Drive to pin 1",
   "• What minerals are here?",
 ].join("\n");
 
@@ -30,6 +38,8 @@ function findPin(text: string, pins: SciencePin[]): SciencePin | undefined {
 
 function resolveDestination(to: string, ctx: ExecuteContext, sites: CandidateSite[]): RouteTarget | null {
   const t = to.trim().toLowerCase();
+  const userPin = findUserPin(t, ctx.userPins?.pins ?? []);
+  if (userPin) return userPin;
   const siteNumber = t.match(/\bsite\s*#?(\d+)/)?.[1];
   if (siteNumber) {
     const site = sites[Number(siteNumber) - 1];
@@ -51,7 +61,7 @@ function describeRoute(intent: Extract<Intent, { intent: "show_path" }>, ctx: Ex
   if (rover.route?.status === "driving") return { text: "I'm still driving. Ask me again when I arrive." };
   const target = resolveDestination(intent.args.to, ctx, basecamp.topSites);
   if (!target) {
-    return { text: `I don't know where "${intent.args.to}" is. Try "site 2", a pin name, "home", or coordinates like (120, -40).` };
+    return { text: `I don't know where "${intent.args.to}" is. Try "site 2", "pin 1", a pin name, "home", or coordinates like (120, -40).` };
   }
   const route = intent.args.drive ? rover.driveTo(target) : rover.planRoute(target);
   if (!route?.path) {
@@ -112,15 +122,14 @@ function describeScience(text: string, ctx: ExecuteContext): ChatReply {
     return { text: `I have no cited measurements ${where} yet, so I won't guess.\n${mineralNote}` };
   }
 
+  // Each source URL is listed once; every measurement carries the number of its source.
+  const urls = [...new Set(measured.flatMap((p) => [...p.measurements.map((m) => m.source_url), ...p.source_urls]))].filter(Boolean);
+  const cite = (url: string) => (url ? ` [${urls.indexOf(url) + 1}]` : "");
   const lines = measured.flatMap((p) => [
     `${p.name}: ${p.summary}`,
-    ...p.measurements.map((m) => `• ${m.label}: ${m.value}`),
+    ...p.measurements.map((m) => `• ${m.label}: ${m.value}${cite(m.source_url)}`),
   ]);
-  const sources = measured.flatMap((p) => [
-    ...p.measurements.map((m) => ({ label: `${p.name}: ${m.label}`, url: m.source_url })),
-    ...p.source_urls.map((url) => ({ label: p.name, url })),
-  ]);
-  return { text: [...lines, mineralNote].join("\n"), sources: sources.filter((s) => s.url) };
+  return { text: [...lines, mineralNote].join("\n"), sources: urls.map((url) => ({ label: new URL(url).hostname, url })) };
 }
 
 function describePlacement(intent: Extract<Intent, { intent: "place_module" }>, ctx: ExecuteContext): ChatReply {
@@ -131,8 +140,25 @@ function describePlacement(intent: Extract<Intent, { intent: "place_module" }>, 
   return { text: `Placed a ${MODULE_LABELS[intent.args.type].toLowerCase()} at ${label}. Grade ${score?.grade ?? "?"}; see the scorecard.` };
 }
 
+// Starts the same Grok Imagine render the "Concept render" button starts; the picture opens when it is ready.
+function describeConcept(intent: Extract<Intent, { intent: "render_concept" }>, ctx: ExecuteContext): ChatReply {
+  const { concept } = ctx;
+  if (!concept.available) return { text: "Concept renders need the backend, and this app is running without one." };
+  if (concept.busySince !== null) return { text: "A concept render is already on its way. It opens when it is ready." };
+  void concept.render(intent.args.idea);
+  const idea = intent.args.idea ? ` with your idea ("${intent.args.idea}")` : "";
+  return {
+    text: `Asking Grok Imagine to draw the base on your current view${idea}. The picture opens when it is ready, usually in under a minute; progress and any error show under "Concept render" on the right. It is an AI concept picture, not data.`,
+  };
+}
+
 // Runs one intent through the same functions the UI buttons use, and describes the result.
 export function executeIntent(intent: Intent | null, text: string, ctx: ExecuteContext): ChatReply {
+  // User pins are read from the words themselves, so they work the same with Grok or the local reader.
+  const pinned = addPinFromChat(text, ctx.userPins, ctx.rover.position);
+  if (pinned) return pinned;
+  const local = /\bpin\b/i.test(text) ? interpretLocally(text) : null;
+  if (local?.intent === "show_path" && findUserPin(local.args.to, ctx.userPins?.pins ?? [])) intent = local;
   if (!intent) return { text: HELP_TEXT };
   switch (intent.intent) {
     case "show_path":
@@ -143,6 +169,8 @@ export function executeIntent(intent: Intent | null, text: string, ctx: ExecuteC
       return describeScience(intent.args.text || text, ctx);
     case "place_module":
       return describePlacement(intent, ctx);
+    case "render_concept":
+      return describeConcept(intent, ctx);
     default:
       return { text: `I understood "${intent.intent}", but that isn't available in the rover chat yet.` };
   }

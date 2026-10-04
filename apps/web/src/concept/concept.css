@@ -1,0 +1,252 @@
+/* Concept render (Grok Imagine): the panel block and the full-window comparison. */
+.concept-idea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #2c3240;
+  border-radius: 6px;
+  background: #11141b;
+  color: #e8e6e3;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+button.concept-go {
+  border-color: #d9a46c;
+  color: #ffd9a8;
+}
+
+.concept-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffd9a8;
+}
+
+.concept-spinner {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #d9a46c;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: concept-spin 0.9s linear infinite;
+}
+
+@keyframes concept-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.concept-gallery {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.concept-gallery button {
+  padding: 0;
+  overflow: hidden;
+  aspect-ratio: 3 / 2;
+}
+
+.concept-gallery img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.concept-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 6, 9, 0.86);
+}
+
+.concept-viewer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(1700px, 100%);
+  max-height: 100%;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid #2c3240;
+  border-radius: 10px;
+  background: #11141b;
+}
+
+.concept-viewer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: #ffd9a8;
+}
+
+.concept-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.concept-compare.single {
+  grid-template-columns: 1fr;
+}
+
+.concept-compare figure {
+  margin: 0;
+}
+
+.concept-compare img {
+  display: block;
+  width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #0b0d12;
+}
+
+.concept-compare figcaption {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8a909c;
+}
+
+.concept-compare .concept-ai figcaption {
+  color: #ffd9a8;
+}
+
+.concept-prompt {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .concept-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The in-viewer concept view: Grok's picture over the live scene, letterboxed to the captured aspect. */
+.concept-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.concept-box {
+  position: relative;
+  overflow: hidden;
+  cursor: ew-resize;
+  touch-action: none;
+  outline: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.concept-box img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Grok returns the picture a fraction of a percent off the view's aspect, by trimming two edges, not by
+     stretching (measured: stretched to fit, the left and right edges sat 4 px out of 1000 off). */
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.concept-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #ffffff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.concept-divider span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #11141b;
+  font-size: 13px;
+}
+
+.concept-side {
+  position: absolute;
+  bottom: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(11, 13, 18, 0.8);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.concept-side-live {
+  left: 10px;
+}
+
+.concept-side-ai {
+  right: 10px;
+  color: #ffd9a8;
+}
+
+.concept-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  max-width: calc(100% - 24px);
+  padding: 8px 12px;
+  border: 1px solid #2c3240;
+  border-radius: 10px;
+  background: rgba(17, 20, 27, 0.94);
+  font-size: 13px;
+}
+
+.concept-exit {
+  border-color: #ffd9a8;
+  color: #ffd9a8;
+}
+
+.panel ul.concept-list {
+  padding-left: 0;
+  list-style: none;
+}
+
+.concept-list .buttons {
+  margin-top: 4px;
+}
+
+.concept-pin-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  background: #b392f0;
+  transform: rotate(45deg);
+}
+
+.concept-pin-dot.off {
+  background: none;
+  outline: 1px solid #5a6072;
+}

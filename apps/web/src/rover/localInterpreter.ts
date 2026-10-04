@@ -7,6 +7,10 @@ export function interpretLocally(text: string): Intent | null {
   const t = text.trim().toLowerCase();
   if (!t || /\b(help|what can you do|commands)\b/.test(t)) return null;
 
+  if (/\b(render|picture|image|concept|visuali[sz]e|imagine|look like|draw)\b/.test(t)) {
+    return { intent: "render_concept", args: {} };
+  }
+
   const destination =
     t.match(/\b(?:to|reach|get to|at)\s+(.+?)[?.!]*$/)?.[1] ??
     t.match(/\b(?:is|are)\s+(.+?)\s+reachable/)?.[1] ??

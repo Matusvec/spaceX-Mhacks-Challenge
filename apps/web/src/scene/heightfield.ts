@@ -36,12 +36,20 @@ export function nearestCellIndex(field: Heightfield, x: number, y: number): numb
   return row * field.cols + col;
 }
 
+// Mesh vertices on the terrain edge are stored as float32, so they can land a rounding error outside
+// (for example with size_m 1896.68). Counting them as outside put a wall of z = 0 along the edge.
+const EDGE_CELLS = 1e-3;
+
 // Bilinear height at site (x east, y north), or null outside the terrain.
 export function sampleHeight(field: Heightfield, x: number, y: number): number | null {
   const [width, depth] = field.sizeM;
-  const col = ((x + width / 2) / width) * (field.cols - 1);
-  const row = ((depth / 2 - y) / depth) * (field.rows - 1);
-  if (col < 0 || row < 0 || col > field.cols - 1 || row > field.rows - 1) return null;
+  const colRaw = ((x + width / 2) / width) * (field.cols - 1);
+  const rowRaw = ((depth / 2 - y) / depth) * (field.rows - 1);
+  if (colRaw < -EDGE_CELLS || rowRaw < -EDGE_CELLS || colRaw > field.cols - 1 + EDGE_CELLS || rowRaw > field.rows - 1 + EDGE_CELLS) {
+    return null;
+  }
+  const col = Math.min(Math.max(colRaw, 0), field.cols - 1);
+  const row = Math.min(Math.max(rowRaw, 0), field.rows - 1);
 
   const c0 = Math.floor(col);
   const r0 = Math.floor(row);

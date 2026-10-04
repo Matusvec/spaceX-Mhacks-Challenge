@@ -56,7 +56,14 @@ body,
   color: #8a909c;
 }
 
-select {
+.field input[type="range"] {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+select,
+.field input {
   padding: 5px 8px;
   border: 1px solid #2c3240;
   border-radius: 6px;
@@ -85,6 +92,29 @@ select {
   height: 8px;
   border-radius: 4px;
   background: linear-gradient(to right, #d7301f, #fee08b, #1a9850);
+}
+
+.panel ul.swatches {
+  margin-top: 8px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 2px;
+}
+
+.panel form,
+.shielding {
+  margin-top: 12px;
+}
+
+.estimate {
+  color: #ffb454;
 }
 
 .panel ol.sites {
@@ -161,6 +191,7 @@ button.active {
 
 .panel dd {
   margin: 0;
+  overflow-wrap: anywhere; /* product ids and URLs in source text have no spaces */
 }
 
 .panel a {
@@ -301,6 +332,20 @@ progress {
   color: #8a909c;
 }
 
+.chat-more {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.panel details {
+  margin-top: 4px;
+}
+
+.panel summary {
+  cursor: pointer;
+  color: #4fd1ff;
+}
+
 .chat-sources a {
   margin-right: 4px;
   color: #4fd1ff;
@@ -338,11 +383,262 @@ progress {
 .readout {
   position: absolute;
   left: 16px;
-  top: 16px;
+  bottom: 16px; /* the top edge holds the live chip and the camera bar */
   padding: 6px 10px;
   border-radius: 6px;
   background: rgba(11, 13, 18, 0.8);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
+}
+
+/* Camera mode buttons over the 3D view. */
+.camera-bar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  text-align: right;
+  pointer-events: none;
+}
+.camera-bar .buttons {
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+.camera-bar button.active {
+  border-color: #5cc8ff;
+  color: #5cc8ff;
+}
+.camera-bar p {
+  display: inline-block;
+  margin: 6px 0 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(11, 13, 18, 0.8); /* same backing as the hover readout: readable over a bright sky */
+  color: #c9cdd6;
+}
+
+/* The Sources button stays at the bottom of the left panel; its dialog lists every citation. */
+.sources-bar {
+  position: sticky;
+  bottom: -20px;
+  margin: 16px -20px -20px;
+  padding: 10px 20px;
+  border-top: 1px solid #1f232d;
+  background: #11141b;
+}
+
+dialog.sources {
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  padding: 20px 24px;
+  border: 1px solid #2c3240;
+  border-radius: 10px;
+  background: #11141b;
+  color: #e8e6e3;
+  font-size: 14px;
+}
+
+dialog.sources::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+dialog.sources h2 {
+  margin: 20px 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a909c;
+}
+
+dialog.sources ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+dialog.sources li {
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+
+dialog.sources a {
+  color: #4fd1ff;
+}
+
+.sources-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.sources-head h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+/* Shared session (SpacetimeDB): status chip, people, user pins, placed modules. */
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: #2a2f3a;
+  color: #c9ced8;
+}
+
+.chip-live {
+  background: #12382a;
+  color: #7bed9f;
+}
+
+.chip-offline {
+  background: #3a2a14;
+  color: #ffc56b;
+}
+
+.shared .dot,
+.shared .diamond {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+
+.shared .diamond {
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+.panel ul.people,
+.panel ul.shared-modules {
+  padding-left: 0;
+  list-style: none;
+}
+
+.panel ol.user-pins {
+  padding-left: 20px;
+}
+
+.shared .buttons {
+  margin-top: 4px;
+}
+
+.shared .buttons button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+button.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #4fd1ff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pin-form {
+  display: grid;
+  gap: 6px;
+}
+
+.pin-form input {
+  padding: 5px 8px;
+  border: 1px solid #2c3240;
+  border-radius: 6px;
+  background: #1a1f29;
+  color: #e8e6e3;
+  font: inherit;
+}
+
+.stage-chip {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* A panel section that folds: its summary looks like the other section headings. */
+details.fold > summary {
+  margin: 20px 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a909c;
+  cursor: pointer;
+}
+
+/* Shell: the bar with the scene switcher and the signed-in person, above either the home screen or a scene. */
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.shell-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 16px;
+  border-bottom: 1px solid #1f232d;
+  background: #0e1117;
+  font-size: 13px;
+}
+
+.shell-bar select {
+  max-width: 420px;
+}
+
+.shell-who {
+  margin-left: auto;
+}
+
+.shell-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.home {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 48px 24px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.home-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid #2c3240;
+  border-radius: 10px;
+  background: #11141b;
+}
+
+.signin {
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+.signin h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.scene-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+button.scene-card {
+  text-align: left;
+  font-size: 15px;
+}
+
+button.scene-card:hover {
+  border-color: #4fd1ff;
 }

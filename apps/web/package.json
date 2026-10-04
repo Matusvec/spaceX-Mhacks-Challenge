@@ -14,6 +14,7 @@
     "fast-png": "^8.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "spacetimedb": "2.10",
     "three": "^0.186.1"
   },
   "devDependencies": {

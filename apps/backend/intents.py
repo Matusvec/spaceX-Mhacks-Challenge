@@ -4,9 +4,13 @@ import json
 from typing import Annotated, Literal, Union
 
 import httpx
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 import settings
+import xai
+
+router = APIRouter(dependencies=[Depends(xai.require_team_code)])
 
 ModuleType = Literal["habitat", "greenhouse_dome", "tunnel", "landing_pad", "solar_field"]
 
@@ -100,8 +104,9 @@ Reply with only a JSON object, no other text. Allowed intents and argument schem
   Put a base module somewhere; "at" uses the same forms as "to" above.
 {"intent": "query_scene", "args": {"text": string}}
   Questions about rocks, minerals, chemistry, samples, or what the rover found. Use the user's words as "text".
-{"intent": "render_concept", "args": {}}
-  Make a picture or concept render of the base.
+{"intent": "render_concept", "args": {"idea"?: string}}
+  Make a picture, image, visualization or concept render of the base, or show what the base would look like.
+  "idea" is the user's own description of the base design, if they gave one (for example "three domes linked by tunnels").
 {"intent": "toggle_layer", "args": {"layer": string, "on": boolean}}
 {"intent": "compare_sites", "args": {"a": number, "b": number}}
 
@@ -113,7 +118,7 @@ async def _ask_grok(text: str, pins: list[str]) -> str:
     user = f"Pins in this scene: {', '.join(pins) or 'none'}\nMessage: {text}"
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
-            "https://api.x.ai/v1/chat/completions",
+            f"{settings.XAI_BASE_URL}/chat/completions",
             headers={"Authorization": f"Bearer {settings.XAI_API_KEY}"},
             json={
                 "model": settings.XAI_TEXT_MODEL,
@@ -135,3 +140,25 @@ async def text_to_intent(text: str, pins: list[str]) -> dict:
         except (ValidationError, json.JSONDecodeError, KeyError):
             continue
     return {"intent": "query_scene", "args": {"text": text}}
+
+
+
+class IntentContext(BaseModel):
+    selected_module_id: int | None = None
+    pins: list[str] = []
+
+
+class IntentRequest(BaseModel):
+    text: str = Field(max_length=2000)
+    scene_id: str
+    context: IntentContext = IntentContext()
+
+
+@router.post("/intent")
+async def intent(request: IntentRequest):
+    if not settings.XAI_API_KEY:
+        raise HTTPException(503, xai.NO_KEY_MESSAGE)
+    try:
+        return await text_to_intent(request.text, request.context.pins)
+    except httpx.HTTPError as err:
+        raise xai.upstream_error(err, "Grok chat") from err

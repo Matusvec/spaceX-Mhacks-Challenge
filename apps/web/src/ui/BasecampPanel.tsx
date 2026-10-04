@@ -1,11 +1,13 @@
 import { MODULE_LABELS } from "../config/scoring";
+import { ConceptSection } from "../concept/ConceptSection";
+import type { Concept } from "../concept/useConcept";
 import type { ModuleType } from "../contracts";
 import { Scorecard } from "./Scorecard";
 import type { Basecamp } from "./useBasecamp";
 
 const PLACEABLE: ModuleType[] = ["habitat", "greenhouse_dome", "landing_pad", "solar_field"];
 
-export function BasecampPanel({ basecamp }: { basecamp: Basecamp }) {
+export function BasecampPanel({ basecamp, concept }: { basecamp: Basecamp; concept: Concept }) {
   const { evaluation, placement } = basecamp;
 
   return (
@@ -36,7 +38,7 @@ export function BasecampPanel({ basecamp }: { basecamp: Basecamp }) {
       </div>
       <p className="muted small">
         Computed from terrain heights
-        {basecamp.resolutionM !== null && ` (${basecamp.resolutionM.toFixed(1)} m/px)`} and science pins.
+        {basecamp.resolutionM !== null && ` (${basecamp.resolutionM.toFixed(1)} m/px)`} and science pins. Fades out up close.
       </p>
 
       <h2>Best sites</h2>
@@ -78,6 +80,8 @@ export function BasecampPanel({ basecamp }: { basecamp: Basecamp }) {
       ) : (
         <p className="muted">Pick a best site or place a module to see its scorecard.</p>
       )}
+
+      <ConceptSection concept={concept} />
     </section>
   );
 }

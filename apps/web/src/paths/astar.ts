@@ -66,7 +66,7 @@ function* passableNeighbors(grid: RoverGrid, index: number): Generator<[number, 
     const c = col + dc;
     if (r < 0 || c < 0 || r >= grid.rows || c >= grid.cols) continue;
     const next = r * grid.cols + c;
-    if (grid.passable[next]) yield [next, Math.hypot(dr, dc) * grid.cellM];
+    if (grid.passable[next]) yield [next, Math.hypot(dr * grid.cellYM, dc * grid.cellM)];
   }
 }
 
