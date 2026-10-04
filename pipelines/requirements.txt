@@ -1,13 +1,15 @@
-# Local pipeline env (RTX 5070, Blackwell needs cu128+). Install:
-#   uv venv --python 3.11 .venv
-#   uv pip install -r pipelines/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
-torch
-torchvision
+# Local pipeline + backend env (RTX 5070, Blackwell needs cu128 or newer).
+#   uv venv --python 3.12 .venv
+#   uv pip install --python .venv/bin/python torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
+#   uv pip install --python .venv/bin/python -r pipelines/requirements.txt
+# Data scripts don't need this env: run them with `uv run --no-project --with ...` (see each file's docstring).
 gsplat
 pycolmap
+rasterio
 numpy
 pillow
 opencv-python-headless
 scipy
 tyro
 tqdm
+skyfield
