@@ -7,14 +7,23 @@ import { interpretLocally } from "./localInterpreter";
 export type Interpretation = { intent: Intent | null; via: "grok" | "local"; why?: string };
 
 // Text to one intent: the backend's /intent (Grok) when configured, else the local keyword reader.
-export async function interpret(text: string, sceneId: string, pinNames: string[]): Promise<Interpretation> {
+// `facts` (sceneFacts.ts) and `history` let Grok answer questions in its own words and follow a conversation.
+export type ChatTurn = { role: "user" | "assistant"; text: string };
+
+export async function interpret(
+  text: string,
+  sceneId: string,
+  pinNames: string[],
+  facts = "",
+  history: ChatTurn[] = [],
+): Promise<Interpretation> {
   let why = "no backend configured";
   if (hasApi) {
     try {
       const response = await apiFetch("/intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, scene_id: sceneId, context: { pins: pinNames } }),
+        body: JSON.stringify({ text, scene_id: sceneId, context: { pins: pinNames, facts, history } }),
       });
       if (response.ok) return { intent: (await response.json()) as Intent, via: "grok" };
       why = await backendError(response);

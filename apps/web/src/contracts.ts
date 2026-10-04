@@ -95,6 +95,7 @@ export type Intent =
   | { intent: "show_path"; args: { from: string; to: string; drive?: boolean } }
   | { intent: "query_scene"; args: { text: string } }
   | { intent: "render_concept"; args: { idea?: string } }
+  | { intent: "answer"; args: { text: string } } // Grok's own short reply, grounded in the scene facts sent with the request
   | { intent: "toggle_layer"; args: { layer: string; on: boolean } }
   | { intent: "compare_sites"; args: { a: number; b: number } };
 

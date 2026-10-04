@@ -171,6 +171,8 @@ export function executeIntent(intent: Intent | null, text: string, ctx: ExecuteC
       return describePlacement(intent, ctx);
     case "render_concept":
       return describeConcept(intent, ctx);
+    case "answer":
+      return { text: intent.args.text };
     default:
       return { text: `I understood "${intent.intent}", but that isn't available in the rover chat yet.` };
   }

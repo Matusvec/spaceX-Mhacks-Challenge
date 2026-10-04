@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { executeIntent, HELP_TEXT, type ChatReply, type ExecuteContext } from "../rover/executeIntent";
-import { interpret } from "../rover/interpret";
+import { interpret, type ChatTurn } from "../rover/interpret";
+import { sceneFacts } from "../rover/sceneFacts";
 import { TeamCodeField } from "../rover/TeamCodeField";
 import { GROK_STATUS_TEXT, useGrokStatus } from "../rover/useGrokStatus";
 import { useVoice } from "../voice/useVoice";
@@ -49,7 +50,12 @@ export function RoverChat({ context }: { context: ExecuteContext | null }) {
     setMessages((m) => [...m, { id: nextId.current++, from: "you", text, tag: spoken ? "heard by Grok Voice" : undefined }]);
     try {
       const pinNames = ctx.pins.map((p) => p.name);
-      const { intent, via, why } = await interpret(text, ctx.manifest.scene_id, pinNames);
+      // The last few turns go along, so a follow-up ("and how big is it?") makes sense to Grok.
+      const history: ChatTurn[] = messages
+        .slice(1)
+        .slice(-6)
+        .map((m) => ({ role: m.from === "you" ? "user" : "assistant", text: m.text.slice(0, 500) }));
+      const { intent, via, why } = await interpret(text, ctx.manifest.scene_id, pinNames, sceneFacts(ctx), history);
       // Read the context again: the scene may have changed while waiting for the backend.
       const reply = executeIntent(intent, text, contextRef.current ?? ctx);
       setMessages((m) => [...m, { id: nextId.current++, from: "rover", ...reply, tag: intent?.intent, via, why }]);

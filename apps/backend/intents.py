@@ -60,6 +60,17 @@ class QueryScene(BaseModel):
     args: QuerySceneArgs
 
 
+class AnswerArgs(BaseModel):
+    text: str = Field(min_length=1, max_length=900)
+
+
+class Answer(BaseModel):
+    """A spoken-length reply in Grok's own words, grounded in the scene facts the client sent."""
+
+    intent: Literal["answer"]
+    args: AnswerArgs
+
+
 class RenderConcept(BaseModel):
     intent: Literal["render_concept"]
     args: dict = {}
@@ -86,7 +97,7 @@ class CompareSites(BaseModel):
 
 
 Intent = Annotated[
-    Union[FindSites, PlaceModule, ShowPath, QueryScene, RenderConcept, ToggleLayer, CompareSites],
+    Union[FindSites, PlaceModule, ShowPath, QueryScene, RenderConcept, ToggleLayer, CompareSites, Answer],
     Field(discriminator="intent"),
 ]
 intent_adapter = TypeAdapter(Intent)
@@ -103,19 +114,33 @@ Reply with only a JSON object, no other text. Allowed intents and argument schem
 {"intent": "place_module", "args": {"type": "habitat"|"greenhouse_dome"|"tunnel"|"landing_pad"|"solar_field", "at": string}}
   Put a base module somewhere; "at" uses the same forms as "to" above.
 {"intent": "query_scene", "args": {"text": string}}
-  Questions about rocks, minerals, chemistry, samples, or what the rover found. Use the user's words as "text".
+  Only when the user asks to list or show the measurements, minerals, chemistry or samples (the app then shows
+  the cited table). Use the user's words as "text". Any other question is an "answer".
+{"intent": "answer", "args": {"text": string}}
+  Conversation: greetings, what this place is, questions about the scene, the rocks, sizes, distances, the base
+  being planned, follow-up questions, or what the app can do, whenever no action above is being asked for.
+  "text" is your reply, spoken aloud: one to three short sentences, plain words, no lists, no markdown.
+  For anything scientific or numeric, use ONLY the scene facts given with the message. If they do not contain it,
+  say plainly that this scene has no data on that. Never invent measurements, minerals, dates or numbers.
+  You may say what the app can do: plan and drive rover routes, suggest and score base sites, place modules,
+  show cited measurements, and draw a concept picture of the base.
 {"intent": "render_concept", "args": {"idea"?: string}}
   Make a picture, image, visualization or concept render of the base, or show what the base would look like.
   "idea" is the user's own description of the base design, if they gave one (for example "three domes linked by tunnels").
 {"intent": "toggle_layer", "args": {"layer": string, "on": boolean}}
 {"intent": "compare_sites", "args": {"a": number, "b": number}}
 
-If the message is unclear or none fit, use {"intent": "query_scene", "args": {"text": <the message>}}.
+If the message is unclear or none of the actions fit, use "answer" and reply helpfully; do not repeat an earlier reply.
 Never invent pin names; use them only if the user mentions them."""
 
 
-async def _ask_grok(text: str, pins: list[str]) -> str:
-    user = f"Pins in this scene: {', '.join(pins) or 'none'}\nMessage: {text}"
+async def _ask_grok(text: str, pins: list[str], facts: str = "", history: list[dict] | None = None) -> str:
+    said = "\n".join(f"{'User' if turn['role'] == 'user' else 'You'}: {turn['text']}" for turn in history or [])
+    user = (
+        f"Scene facts (the only source for scientific or numeric claims):\n{facts or 'none given'}\n\n"
+        f"Conversation so far:\n{said or 'none'}\n\n"
+        f"Pins in this scene: {', '.join(pins) or 'none'}\nMessage: {text}"
+    )
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
             f"{settings.XAI_BASE_URL}/chat/completions",
@@ -131,11 +156,11 @@ async def _ask_grok(text: str, pins: list[str]) -> str:
         return response.json()["choices"][0]["message"]["content"]
 
 
-async def text_to_intent(text: str, pins: list[str]) -> dict:
+async def text_to_intent(text: str, pins: list[str], facts: str = "", history: list[dict] | None = None) -> dict:
     """One validated intent. Retries once on a bad reply, then falls back to query_scene."""
     for _ in range(2):
         try:
-            intent = intent_adapter.validate_python(json.loads(await _ask_grok(text, pins)))
+            intent = intent_adapter.validate_python(json.loads(await _ask_grok(text, pins, facts, history)))
             return intent.model_dump(by_alias=True, exclude_none=True)
         except (ValidationError, json.JSONDecodeError, KeyError):
             continue
@@ -143,9 +168,16 @@ async def text_to_intent(text: str, pins: list[str]) -> dict:
 
 
 
+class Turn(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str = Field(max_length=600)
+
+
 class IntentContext(BaseModel):
     selected_module_id: int | None = None
     pins: list[str] = []
+    facts: str = Field("", max_length=8000)  # what the viewer has loaded for this scene, as plain text
+    history: list[Turn] = Field([], max_length=8)  # the last few turns, so follow-up questions work
 
 
 class IntentRequest(BaseModel):
@@ -159,6 +191,7 @@ async def intent(request: IntentRequest):
     if not settings.XAI_API_KEY:
         raise HTTPException(503, xai.NO_KEY_MESSAGE)
     try:
-        return await text_to_intent(request.text, request.context.pins)
+        context = request.context
+        return await text_to_intent(request.text, context.pins, context.facts, [turn.model_dump() for turn in context.history])
     except httpx.HTTPError as err:
         raise xai.upstream_error(err, "Grok chat") from err
