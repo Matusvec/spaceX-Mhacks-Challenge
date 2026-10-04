@@ -2,6 +2,7 @@ import { MODULE_LABELS, moduleFootprint, SCORING } from "../config/scoring";
 import type { Body, ModuleType, Score, SciencePin } from "../contracts";
 import { cellSizeM, nearestCellIndex, type Heightfield } from "../scene/heightfield";
 import { sampleFootprint } from "./footprint";
+import { moonTerms, type SiteValues } from "./siteValues";
 
 export type ScoringContext = {
   body: Body;
@@ -10,9 +11,12 @@ export type ScoringContext = {
   pins: SciencePin[];
   // Whether the rover can drive to site (x, y); omitted until a rover position is known.
   isReachable?: (x: number, y: number) => boolean;
+  // Moon rasters and shielding factors of the scene, once decoded; absent on Mars.
+  site?: SiteValues | null;
 };
 
-export type SitePlacement = { type: ModuleType; x: number; y: number; rotationZDeg: number };
+// coverM: regolith piled over a crew shelter, meters (only scored where the scene has cited shielding data).
+export type SitePlacement = { type: ModuleType; x: number; y: number; rotationZDeg: number; coverM?: number };
 
 export type SiteEvaluation = {
   score: Score;
@@ -52,7 +56,10 @@ export function evaluateSite(site: SitePlacement, ctx: ScoringContext): SiteEval
   const mean = heights.reduce((sum, h) => sum + h, 0) / heights.length;
   const flatnessM = Math.sqrt(heights.reduce((sum, h) => sum + (h - mean) ** 2, 0) / heights.length);
   const cellAreaM2 = areaM2 / heights.length;
-  const cutFillM3 = heights.reduce((sum, h) => sum + Math.abs(h - padHeightM), 0) * cellAreaM2;
+  const levelingM3 = heights.reduce((sum, h) => sum + Math.abs(h - padHeightM), 0) * cellAreaM2;
+  // Moon: sunlight, Earth view and dose at the module center; a regolith cover lowers the dose and adds earthworks.
+  const moon = moonTerms(ctx.site, site, areaM2);
+  const cutFillM3 = levelingM3 + (moon.coverM3 ?? 0);
 
   const distToScienceM = ctx.pins.length
     ? Math.min(...ctx.pins.map((pin) => Math.hypot(pin.position_site[0] - site.x, pin.position_site[1] - site.y)))
@@ -82,8 +89,12 @@ export function evaluateSite(site: SitePlacement, ctx: ScoringContext): SiteEval
   penalize(
     weights.cutFill,
     ramp(cutFillM3, 0, SCORING.cutFillWorstM3PerM2 * areaM2),
-    `${Math.round(cutFillM3)} m³ of ground to move to level the pad`,
+    moon.coverM3
+      ? `${Math.round(cutFillM3)} m³ of ground to move (leveling ${Math.round(levelingM3)} + cover ${moon.coverM!.toFixed(2)} m × ${Math.round(areaM2)} m² footprint)`
+      : `${Math.round(cutFillM3)} m³ of ground to move to level the pad`,
   );
+  for (const term of moon.penalties) penalize(term.weight, term.fraction, term.note);
+  const { penalties: _moonPenalties, ...moonScore } = moon;
   if (distToScienceM !== null) {
     penalize(
       weights.science,
@@ -105,6 +116,7 @@ export function evaluateSite(site: SitePlacement, ctx: ScoringContext): SiteEval
       cutFillM3,
       distToScienceM,
       roverReachable,
+      ...moonScore,
       notes,
     },
     padHeightM,

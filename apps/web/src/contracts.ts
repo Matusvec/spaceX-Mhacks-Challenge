@@ -46,8 +46,14 @@ export type RasterLayer = {
 };
 
 // shielding.json: sourced factors by which regolith cover changes the Moon's dose_estimate layer.
+export type ShieldingPoint = { depth_m: number; factor: number; quote: string; source_url: string; how?: string };
 export type Shielding = {
-  points: { depth_m: number; factor: number; quote: string; source_url: string }[];
+  points: ShieldingPoint[];
+  // A deeper cited series (0 to 3 m) used for a module's regolith cover when present; never merged with `points`.
+  points_deep?: ShieldingPoint[];
+  // Another model for the same depths, shown only to say where it disagrees; never used for scoring.
+  points_deep_deangelis2002?: ShieldingPoint[];
+  series?: Record<string, { source: { citation: string; url: string } }>;
   limits: string;
   unit_depth: string;
   source: { citation: string; url: string };
@@ -81,7 +87,13 @@ export type Score = {
   roverReachable: boolean | null;
   illuminationPct?: number;
   earthVisiblePct?: number;
-  doseEstimate_mSvPerYear?: number;
+  doseEstimate_mSvPerYear?: number; // behind the regolith cover, if any
+  // Regolith cover (Moon, crew shelters): depth, the cited dose factor at that depth, the dose with no cover, and
+  // the regolith to pile on (cover depth x footprint area), which is included in cutFillM3.
+  coverM?: number;
+  shieldingFactor?: number;
+  doseUnshielded_mSvPerYear?: number;
+  coverM3?: number;
   notes: string[];
 };
 
@@ -95,6 +107,8 @@ export type Intent =
   | { intent: "show_path"; args: { from: string; to: string; drive?: boolean } }
   | { intent: "query_scene"; args: { text: string } }
   | { intent: "render_concept"; args: { idea?: string } }
+  // Regolith cover on the module being placed. No depth_m: "bury it" with no number, so the deepest cited depth is used.
+  | { intent: "set_cover"; args: { depth_m?: number | null } }
   | { intent: "answer"; args: { text: string } } // Grok's own short reply, grounded in the scene facts sent with the request
   | { intent: "toggle_layer"; args: { layer: string; on: boolean } }
   | { intent: "compare_sites"; args: { a: number; b: number } };

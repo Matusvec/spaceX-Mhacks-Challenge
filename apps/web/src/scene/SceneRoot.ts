@@ -19,6 +19,7 @@ import { createRoverModel, type RoverModel } from "./roverModel";
 import { loadSplatMesh, type SplatSource } from "./splat";
 import { sampleSurface } from "./splatSurface";
 import { setSplatFeather } from "./splatFeather";
+import { STAND_ASIDE_M, VR_ENABLED, VrMode } from "./vrMode";
 import { createTerrainMesh, sinkTerrainUnder } from "./terrain";
 
 export type HoverInfo = { x: number; y: number; z: number } | null;
@@ -86,6 +87,9 @@ export class SceneRoot {
   private lastFrameMs = 0;
   private roverTimeScale = 600;
   private readonly rig: CameraRig;
+  private readonly vrRig = new THREE.Group();
+  private vr: VrMode | null = null;
+  private vrListener: (() => void) | null = null;
   private pathMesh: THREE.Mesh | null = null;
   private drive: RoverDrive | null = null;
 
@@ -116,6 +120,23 @@ export class SceneRoot {
     this.controls.maxPolarAngle = Math.PI / 2 - 0.05;
     // The site frame is z-up and the world y-up: site (x, y, z) is world (x, z, -y).
     this.rig = new CameraRig(this.camera, this.controls, () => this.rover, (x, z) => this.heightAt(x, -z));
+    // VR (vrMode.ts) exists only when the page address has ?vr=1; otherwise nothing below is set up.
+    if (VR_ENABLED) {
+      // The camera's parent stays at the origin, unturned, except in VR, where it carries the person.
+      this.scene.add(this.vrRig);
+      this.vrRig.add(this.camera);
+      const vr = new VrMode(this.renderer, this.spark, this.camera, this.vrRig, {
+        groundY: (x, z) => this.heightAt(x, -z),
+        start: () => this.vrStart(),
+        splat: () => this.splat,
+        onChange: () => {
+          if (vr.supported) void vr.prepare();
+          this.controls.enabled = !vr.presenting && !this.placeHandler && !this.heldPose;
+          this.vrListener?.();
+        },
+      });
+      this.vr = vr;
+    }
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
@@ -132,7 +153,10 @@ export class SceneRoot {
       const dtMs = Math.min(100, timeMs - this.lastFrameMs);
       this.lastFrameMs = timeMs;
       this.updateDrive(dtMs);
-      if (this.heldPose) {
+      if (this.vr?.presenting) {
+        // In a headset: the head is the camera; thumbsticks move the person over the ground.
+        this.vr.update(dtMs / 1000);
+      } else if (this.heldPose) {
         // Concept view: the camera stays exactly where a concept render was taken from.
         applyPose(this.heldPose, this.camera, this.controls.target, this.siteRoot);
       } else {
@@ -177,6 +201,8 @@ export class SceneRoot {
     this.splatFromBundle = source.kind === "bundle";
     if (this.terrain && this.bundle) sinkTerrainUnder(this.terrain, this.bundle.heightfield, mesh.getBoundingBox());
     this.featherSplat();
+
+    if (this.vr?.supported) void this.vr.prepare();
 
     const size = mesh.getBoundingBox().getSize(new THREE.Vector3());
     return { count: mesh.numSplats, sizeM: [size.x, size.y, size.z] };
@@ -263,7 +289,7 @@ export class SceneRoot {
   // Runs every frame; also tells the presentation fill whether any map is drawn on the tile.
   private fadeSuitability(): void {
     const distance = this.camera.position.distanceTo(this.controls.target);
-    const shown = THREE.MathUtils.smoothstep(distance, GRADE_GONE_BELOW_M, GRADE_FULL_ABOVE_M);
+    const shown = this.vr?.presenting ? 0 : THREE.MathUtils.smoothstep(distance, GRADE_GONE_BELOW_M, GRADE_FULL_ABOVE_M);
     if (this.suitability) {
       (this.suitability.material as THREE.MeshBasicMaterial).opacity = this.suitability.userData.opacity * shown;
       this.suitability.visible = shown > 0 && !this.rasterOverlay;
@@ -359,6 +385,31 @@ export class SceneRoot {
 
   setCameraMode(mode: CameraMode): void {
     this.rig.setMode(mode);
+  }
+
+  // VR (vrMode.ts). `supported` is true only with ?vr=1 and where the browser can start an immersive session.
+  vrState(): { supported: boolean; presenting: boolean; preparing: boolean } {
+    return { supported: this.vr?.supported ?? false, presenting: this.vr?.presenting ?? false, preparing: this.vr?.preparing ?? false };
+  }
+
+  onVrChange(listener: (() => void) | null): void {
+    this.vrListener = listener;
+  }
+
+  toggleVr(): void {
+    void this.vr?.toggle();
+  }
+
+  // Where a person entering VR stands and what they face, as world (x, z): beside the rover, looking at
+  // the first science pin (the hero rock on Mars); with no pin, a few metres south of the rover looking north.
+  private vrStart(): { stand: THREE.Vector2; face: THREE.Vector2 | null } {
+    const rover = this.rover?.group.position ?? new THREE.Vector3();
+    const pin = this.bundle?.pins[0]?.position_site;
+    const toWorld = (x: number, y: number) => new THREE.Vector2(x, -y);
+    if (!pin) return { stand: toWorld(rover.x, rover.y - STAND_ASIDE_M), face: toWorld(rover.x, rover.y + 100) };
+    const toPin = new THREE.Vector2(pin[0] - rover.x, pin[1] - rover.y);
+    const aside = toPin.lengthSq() > 0.01 ? new THREE.Vector2(-toPin.y, toPin.x).setLength(STAND_ASIDE_M) : new THREE.Vector2(0, -STAND_ASIDE_M);
+    return { stand: toWorld(rover.x + aside.x, rover.y + aside.y), face: toWorld(pin[0], pin[1]) };
   }
 
   // Double-clicking the terrain calls the handler with that site point (not while placing or driving).

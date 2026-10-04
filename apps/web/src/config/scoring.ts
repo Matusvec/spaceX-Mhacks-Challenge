@@ -4,7 +4,10 @@ import type { Body, ModuleType } from "../contracts";
 // Each penalty grows linearly from 0 at its threshold to its full weight at its "worst" value.
 export const SCORING = {
   slopeLimitDeg: { habitat: 5, greenhouse_dome: 5, landing_pad: 3, solar_field: 10, tunnel: 15 } satisfies Record<ModuleType, number>,
-  weights: { slope: 30, flatness: 15, cutFill: 15, science: 15, access: 15, moonSun: 5, moonEarth: 5 },
+  // moonDose: radiation counts as much as slope, for crew shelters only (modules/siteValues.ts).
+  weights: { slope: 30, flatness: 15, cutFill: 15, science: 15, access: 15, moonSun: 5, moonEarth: 5, moonDose: 30 },
+  // Crew shelters: scored on radiation dose, and can be given a regolith cover where the scene has cited shielding data.
+  coverable: ["habitat", "tunnel"] as ModuleType[],
   scienceIdealM: 50,
   scienceMaxM: 500,
   roverSlopeLimitDeg: 30,

@@ -14,6 +14,16 @@ export function CameraBar({ sceneRoot }: { sceneRoot: SceneRoot | null }) {
 
   useEffect(() => sceneRoot?.setCameraMode(mode), [sceneRoot, mode]);
 
+  // "Enter VR" shows only with ?vr=1 and where the browser can start an immersive session (a headset's own browser).
+  const [vr, setVr] = useState({ supported: false, presenting: false, preparing: false });
+  useEffect(() => {
+    if (!sceneRoot) return;
+    const read = () => setVr(sceneRoot.vrState());
+    sceneRoot.onVrChange(read);
+    read();
+    return () => sceneRoot.onVrChange(null);
+  }, [sceneRoot]);
+
   return (
     <div className="camera-bar">
       <div className="buttons">
@@ -22,6 +32,11 @@ export function CameraBar({ sceneRoot }: { sceneRoot: SceneRoot | null }) {
             {m.label}
           </button>
         ))}
+        {vr.supported && (
+          <button className="vr-enter" title="Stand on the terrain in your headset" onClick={() => sceneRoot?.toggleVr()}>
+            {vr.presenting ? "Exit VR" : vr.preparing ? "Enter VR (preparing…)" : "Enter VR"}
+          </button>
+        )}
       </div>
       {mode === "free" && <p className="muted small">W A S D to fly · Q / E down / up · Shift faster</p>}
     </div>

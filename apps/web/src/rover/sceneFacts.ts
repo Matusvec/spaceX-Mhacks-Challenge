@@ -14,7 +14,10 @@ function scoreLine(score: Partial<Score>): string {
     score.roverReachable != null && (score.roverReachable ? "rover can reach it" : "rover cannot reach it"),
     score.illuminationPct !== undefined && `sunlight ${Math.round(score.illuminationPct)} percent of the time`,
     score.earthVisiblePct !== undefined && `Earth visible ${Math.round(score.earthVisiblePct)} percent of the time`,
-    score.doseEstimate_mSvPerYear !== undefined && `radiation dose estimate ${Math.round(score.doseEstimate_mSvPerYear)} mSv per year (an estimate)`,
+    score.doseEstimate_mSvPerYear !== undefined &&
+      (score.coverM
+        ? `under ${score.coverM.toFixed(2)} m of regolith cover: radiation dose estimate ${Math.round(score.doseEstimate_mSvPerYear)} mSv per year (${Math.round(score.doseUnshielded_mSvPerYear ?? 0)} with no cover, times the cited factor ${(score.shieldingFactor ?? 1).toFixed(3)}), and the cover adds ${Math.round(score.coverM3 ?? 0)} cubic meters to the ground to move`
+        : `radiation dose estimate ${Math.round(score.doseEstimate_mSvPerYear)} mSv per year with no regolith cover (an estimate)`),
     score.notes?.length && `penalties: ${score.notes.join("; ")}`,
   ];
   return parts.filter(Boolean).join(", ");
@@ -68,6 +71,13 @@ export function sceneFacts(ctx: ExecuteContext): string {
       `Best ${MODULE_LABELS[basecamp.moduleType].toLowerCase()} site ${i + 1}: (${site.x.toFixed(0)}, ${site.y.toFixed(0)}) m, ${score ? scoreLine(score) : `grade ${Math.round(site.grade)} of 100`} (computed by the app).`,
     );
   });
+  if (ctx.shielding?.points_deep?.length) {
+    lines.push(
+      `Regolith cover on a module is scored with a deeper cited series (${ctx.shielding.series?.points_deep?.source.citation ?? "see sources"}; an estimate): ` +
+        ctx.shielding.points_deep.map((point) => `${point.depth_m} m: factor ${point.factor}`).join("; ") +
+        ". Linear between points is this app's choice; nothing beyond the deepest point. This series and the next one have different baselines and are never mixed.",
+    );
+  }
   if (ctx.shielding) {
     lines.push(
       `Radiation shielding by regolith depth (dose factor relative to no cover; ${ctx.shielding.source.citation}): ` +

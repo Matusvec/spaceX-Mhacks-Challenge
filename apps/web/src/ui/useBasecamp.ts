@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ModuleType } from "../contracts";
 import { evaluateSite, type ScoringContext, type SitePlacement } from "../modules/scoring";
 import { computeSuitability, findTopSites, siteSeparationM, type CandidateSite } from "../modules/siteSearch";
+import { coverRange, coverSeries, type SiteValues } from "../modules/siteValues";
 import { sampleHeight } from "../scene/heightfield";
 import type { SceneRoot } from "../scene/SceneRoot";
 import type { TerrainAnalysis } from "./useTerrainAnalysis";
@@ -14,13 +15,14 @@ export function useBasecamp(
   sceneRoot: SceneRoot | null,
   analysis: TerrainAnalysis | null,
   isReachable: ((x: number, y: number) => boolean) | undefined,
+  site: SiteValues | null = null, // Moon rasters and shielding factors (ui/useSiteValues.ts)
 ) {
   const [moduleType, setModuleTypeState] = useState<ModuleType>("habitat");
   const [showMap, setShowMap] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [placement, setPlacement] = useState<SitePlacement | null>(null);
 
-  const ctx = useMemo<ScoringContext | null>(() => analysis && { ...analysis, isReachable }, [analysis, isReachable]);
+  const ctx = useMemo<ScoringContext | null>(() => analysis && { ...analysis, isReachable, site }, [analysis, isReachable, site]);
   const grid = useMemo(() => (ctx ? computeSuitability(moduleType, ctx) : null), [ctx, moduleType]);
   const topSites = useMemo(
     () => (grid && ctx ? findTopSites(grid, TOP_SITE_COUNT, siteSeparationM(moduleType, ctx)) : []),
@@ -42,7 +44,7 @@ export function useBasecamp(
   useEffect(() => {
     if (!sceneRoot || !placing) return;
     sceneRoot.setPlaceHandler((x, y) =>
-      setPlacement((current) => ({ type: moduleType, x, y, rotationZDeg: current?.rotationZDeg ?? 0 })),
+      setPlacement((current) => ({ type: moduleType, x, y, rotationZDeg: current?.rotationZDeg ?? 0, coverM: current?.coverM })),
     );
     return () => sceneRoot.setPlaceHandler(null);
   }, [sceneRoot, placing, moduleType]);
@@ -76,6 +78,17 @@ export function useBasecamp(
     return ctx ? evaluateSite({ type, x, y, rotationZDeg: 0 }, ctx).score : null;
   };
 
+  // Regolith cover on the current placement. Depth is held to the cited range; returns what was applied and the
+  // new score, or null when cover is not scored here (no placement, not a crew shelter, or no shielding data).
+  const cover = placement ? coverRange(site, placement.type) : null;
+  const setCover = (depthM: number) => {
+    if (!placement || !cover || !ctx) return null;
+    const coverM = Math.min(Math.max(depthM, 0), cover.maxM);
+    const next = { ...placement, coverM };
+    setPlacement(next);
+    return { coverM, maxM: cover.maxM, clamped: depthM > cover.maxM, score: evaluateSite(next, ctx).score };
+  };
+
   const goToSite = (site: CandidateSite) => {
     setPlacement({ type: moduleType, x: site.x, y: site.y, rotationZDeg: 0 });
     const z = analysis ? (sampleHeight(analysis.heightfield, site.x, site.y) ?? 0) : 0;
@@ -94,6 +107,10 @@ export function useBasecamp(
     evaluation,
     goToSite,
     evaluateAt,
+    cover,
+    setCover,
+    shielding: site?.shielding ?? null,
+    coverSeries: coverSeries(site?.shielding), // the cited series the cover is scored with
     findSites,
     placeAt,
     rotate,

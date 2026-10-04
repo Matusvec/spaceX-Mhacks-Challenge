@@ -19,6 +19,7 @@ import { RoverChat } from "./ui/RoverChat";
 import { RoverPanel } from "./ui/RoverPanel";
 import { ScenePanel } from "./ui/ScenePanel";
 import { useBasecamp } from "./ui/useBasecamp";
+import { useSiteValues } from "./ui/useSiteValues";
 import { useRasterLayer } from "./ui/useRasterLayer";
 import { useSplatLayer } from "./ui/useSplatLayer";
 import { useRover } from "./ui/useRover";
@@ -53,7 +54,8 @@ function Studio({ sceneId, account }: { sceneId: string; account: SharedAccount 
   const shared = useSharedScene(sceneId, account);
   const roverSync = useRoverBroadcast(shared);
   const rover = useRover(sceneRoot, analysis, roverSync);
-  const basecamp = useBasecamp(sceneRoot, analysis, rover.isReachable);
+  const siteValues = useSiteValues(displayedBundle); // Moon rasters and shielding factors for the score
+  const basecamp = useBasecamp(sceneRoot, analysis, rover.isReachable, siteValues.values);
   const body = displayedBundle?.manifest.body ?? null;
   const sharedSync = useSharedSync({ shared, roverSync, sceneRoot, body, rover, basecamp, hover });
   const heightAt = (x: number, y: number) => (displayedBundle && sampleHeight(displayedBundle.heightfield, x, y)) ?? 0;

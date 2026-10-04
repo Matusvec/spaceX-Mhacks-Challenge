@@ -11,19 +11,21 @@ export function setMarkerScale(object: THREE.Object3D, scale: MarkerScale): void
 }
 
 const position = new THREE.Vector3();
+const eye = new THREE.Vector3();
 
 // Call once per frame, before rendering.
 export function scaleMarkers(root: THREE.Object3D, camera: THREE.Camera): void {
+  camera.getWorldPosition(eye); // in VR the camera sits inside a moving rig
   root.traverse((object) => {
     const marker = object.userData.markerScale as MarkerScale | undefined;
     if (!marker) return;
     if (marker.lift) {
       // Measured from the foot of the stalk, so the label does not feed back into its own height.
       position.copy(object.position).setZ(marker.lift.baseZ);
-      const distance = object.parent!.localToWorld(position).distanceTo(camera.position);
+      const distance = object.parent!.localToWorld(position).distanceTo(eye);
       object.position.z = marker.lift.baseZ + marker.lift.heightM * THREE.MathUtils.clamp(distance * marker.perM, marker.min, marker.max);
     } else {
-      const distance = object.getWorldPosition(position).distanceTo(camera.position);
+      const distance = object.getWorldPosition(position).distanceTo(eye);
       object.scale.setScalar(THREE.MathUtils.clamp(distance * marker.perM, marker.min, marker.max));
     }
   });

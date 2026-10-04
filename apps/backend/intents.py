@@ -60,6 +60,15 @@ class QueryScene(BaseModel):
     args: QuerySceneArgs
 
 
+class SetCoverArgs(BaseModel):
+    depth_m: float | None = Field(None, ge=0, le=10000)  # None: no depth was given
+
+
+class SetCover(BaseModel):
+    intent: Literal["set_cover"]
+    args: SetCoverArgs = SetCoverArgs()
+
+
 class AnswerArgs(BaseModel):
     text: str = Field(min_length=1, max_length=900)
 
@@ -97,7 +106,7 @@ class CompareSites(BaseModel):
 
 
 Intent = Annotated[
-    Union[FindSites, PlaceModule, ShowPath, QueryScene, RenderConcept, ToggleLayer, CompareSites, Answer],
+    Union[FindSites, PlaceModule, ShowPath, QueryScene, RenderConcept, ToggleLayer, CompareSites, SetCover, Answer],
     Field(discriminator="intent"),
 ]
 intent_adapter = TypeAdapter(Intent)
@@ -116,6 +125,10 @@ Reply with only a JSON object, no other text. Allowed intents and argument schem
 {"intent": "query_scene", "args": {"text": string}}
   Only when the user asks to list or show the measurements, minerals, chemistry or samples (the app then shows
   the cited table). Use the user's words as "text". Any other question is an "answer".
+{"intent": "set_cover", "args": {"depth_m"?: number}}
+  Bury or cover the module being placed with regolith, put it underground, or tunnel it under the surface.
+  "depth_m" is the depth the user asked for, in meters (50 centimetres is 0.5; "three meters down" is 3). Pass the
+  user's own number even if it is large. Omit "depth_m" when no depth is given. Use 0 to remove the cover.
 {"intent": "answer", "args": {"text": string}}
   Conversation: greetings, what this place is, questions about the scene, the rocks, sizes, distances, the base
   being planned, follow-up questions, or what the app can do, whenever no action above is being asked for.

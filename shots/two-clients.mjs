@@ -138,7 +138,7 @@ async function sharedScenario() {
 
   // 5. Ada drives the rover to pin 1 through the chat; Ben's rover drives too.
   console.log("5. drive      Ada:", await ada.chat("drive to pin 1"));
-  await ben.until(/driving \(sped up\)/, "the drive to start on Ben's screen", 15000);
+  await ben.until(/arrives in \d/i, "the drive to start on Ben's screen", 15000);
   await sleep(1500);
   await ben.shoot("mp-3-ben-rover-driving.png");
   await ada.shoot("mp-3-ada-rover-driving.png");

@@ -2,6 +2,7 @@ import { MODULE_LABELS } from "../config/scoring";
 import { ConceptSection } from "../concept/ConceptSection";
 import type { Concept } from "../concept/useConcept";
 import type { ModuleType } from "../contracts";
+import { CoverControl } from "./CoverControl";
 import { Scorecard } from "./Scorecard";
 import type { Basecamp } from "./useBasecamp";
 
@@ -75,6 +76,7 @@ export function BasecampPanel({ basecamp, concept }: { basecamp: Basecamp; conce
             {MODULE_LABELS[placement.type]} at ({placement.x.toFixed(0)}, {placement.y.toFixed(0)}) m, rotated{" "}
             {placement.rotationZDeg}°
           </p>
+          <CoverControl basecamp={basecamp} score={evaluation.score} />
           <Scorecard score={evaluation.score} />
         </>
       ) : (

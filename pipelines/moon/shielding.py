@@ -10,9 +10,14 @@ Nothing is digitised from a figure and nothing is interpolated here. The only ar
   depth = areal density / regolith density      and      factor = dose behind shield / dose with no regolith.
 The curve is NOT monotonic: the paper finds a minimum near 20 g/cm2 and a rise towards 90 g/cm2 as secondary
 particles (neutrons) build up. Keep it that way; do not fit a smooth curve through it.
+
+Deeper burial (metres of soil, lava tube) comes from other papers, in shielding_deep.py. Those series are written
+next to `points` (points_deep, points_deep_deangelis2002, points_lava_tube) and described under `series`; they are
+on different baselines and are never merged into `points`.
 """
 import json
 
+import shielding_deep
 from common import BUNDLE
 
 SOURCE_URL = "https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2024SW004095"
@@ -100,14 +105,26 @@ def main():
                   "whole-body value (0.84 mSv/d) is about 1.9 times lower than the thin-detector Chang'e 4 measurement that "
                   "the dose_estimate raster is built on; multiplying that raster by the factor is a first-order estimate. "
                   "The paper notes discrepancies of up to 50% between recent models. For comparing designs, not for "
-                  "medical dose planning.",
+                  "medical dose planning. "
+                  "DEEPER SERIES (points_deep, points_deep_deangelis2002, points_lava_tube; see `series`) come from other "
+                  "papers with other dose quantities, baselines, geometries and soil densities. They are NOT on the same "
+                  "baseline as `points` and must not be joined to it or to each other as one curve; each factor is relative "
+                  "to that paper's own surface value. Their depth_m is not comparable with `points` either (3 g/cm3 there, "
+                  "about 1.9 g/cm3 in points_deep): compare by areal_density_g_cm2 where it is given. The two deep curves "
+                  "disagree strongly (at 3 m: 0.07 against 0.40 of the surface value). points_deep and "
+                  "points_deep_deangelis2002 are digitised from figures.",
     }
+    shielding_deep.self_check()
+    deep_lists, deep_series, deep_sources = shielding_deep.build()
+    out.update(deep_lists)
+    out["series"] = deep_series
     (BUNDLE / "shielding.json").write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
 
     manifest = BUNDLE / "scene.json"
     scene = json.loads(manifest.read_text())
     scene["shielding"] = "shielding.json"
-    scene["sources"] = [s for s in scene["sources"] if s["name"] != SOURCE_NAME] + [{"name": SOURCE_NAME, "url": SOURCE_URL}]
+    ours = [{"name": SOURCE_NAME, "url": SOURCE_URL}] + deep_sources
+    scene["sources"] = [s for s in scene["sources"] if s["name"] not in {o["name"] for o in ours}] + ours
     manifest.write_text(json.dumps(scene, indent=2, ensure_ascii=False) + "\n")
     for p in points:
         print(f"  {p['areal_density_g_cm2']:>4} g/cm2 = {p['depth_m']:.4f} m  factor {p['factor']:.3f}   ({p['how']})")

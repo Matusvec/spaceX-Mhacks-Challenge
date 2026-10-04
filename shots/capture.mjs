@@ -11,13 +11,15 @@
 //   RANGE=<value> sets the first slider; CLICK2=<label start> presses a second button (see below),
 //   CAPTURE_VIEW=1 saves <prefix>-captureview.jpg, the image a concept render would send,
 //   STEPS=<json> runs a scripted session of [javascript, shot name] pairs in one page (see below),
+//   URL_PARAMS=<a=b&c=d> adds parameters to the page address (for example vr=1),
+//   INJECT=<file> runs that script in the page before its own code (used for the WebXR emulator),
 //   QUERY=<text> runs a text search in the Splat layers panel,
 //   PANEL_SHOT=1 saves <prefix>-panel.png with the left panel scrolled to PANEL_Y,
 //   SCROLL_PANEL=1 scrolls the left panel to its end,
 //   EVAL=<js expression> prints its JSON value once the scene has loaded,
 //   UNCAPPED=1 turns vsync off so the fps figures show headroom above 60.
 import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -96,9 +98,13 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Emulation.setDeviceMetricsOverride", { width: SIZE[0], height: SIZE[1], deviceScaleFactor: 1, mobile: false });
+  if (process.env.INJECT) {
+    // A script file run in the page before any of its own code (for example a WebXR device emulator).
+    await send("Page.addScriptToEvaluateOnNewDocument", { source: readFileSync(process.env.INJECT, "utf8") });
+  }
   // A shared-session room of its own, so nothing a capture does shows up on other people's screens.
   const ROOM = process.env.ROOM ?? "shots";
-  await send("Page.navigate", { url: `${APP_URL}/?scene=${encodeURIComponent(sceneId)}&room=${encodeURIComponent(ROOM)}${process.env.SIGNED_IN === "1" ? "" : "&solo=1"}` });
+  await send("Page.navigate", { url: `${APP_URL}/?scene=${encodeURIComponent(sceneId)}&room=${encodeURIComponent(ROOM)}${process.env.SIGNED_IN === "1" ? "" : "&solo=1"}${process.env.URL_PARAMS ? `&${process.env.URL_PARAMS}` : ""}` });
 
   // Loaded = terrain is in the scene, every /scenes/ fetch finished, and the splat panel is no longer loading.
   const loadedCheck = `(() => {

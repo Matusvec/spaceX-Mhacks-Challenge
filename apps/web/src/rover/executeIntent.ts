@@ -6,6 +6,8 @@ import { addPinFromChat, findUserPin, type UserPinContext } from "../multiplayer
 import type { SharedModule } from "../multiplayer/types";
 import type { Basecamp } from "../ui/useBasecamp";
 import type { RouteTarget, Rover } from "../ui/useRover";
+import { otherModelNote } from "../modules/siteValues";
+import { shortSource } from "../ui/shortSource";
 import { interpretLocally } from "./localInterpreter";
 
 export type ChatReply = { text: string; sources?: { label: string; url: string }[] };
@@ -158,6 +160,40 @@ function describeConcept(intent: Extract<Intent, { intent: "render_concept" }>, 
   };
 }
 
+// Regolith cover on the module being placed: only as deep as the scene's cited shielding values go, never extrapolated.
+function describeCover(intent: Extract<Intent, { intent: "set_cover" }>, ctx: ExecuteContext): ChatReply {
+  const { basecamp } = ctx;
+  const series = basecamp.coverSeries;
+  if (!series) {
+    return { text: "There is no cited shielding data for this scene, so I can't score regolith cover here. The lunar values do not transfer to another body." };
+  }
+  if (!basecamp.placement) return { text: "Place a habitat or a tunnel first, then I can cover it with regolith." };
+  if (!basecamp.cover) {
+    return { text: `Regolith cover is only scored for crew shelters (habitat, tunnel), not for a ${MODULE_LABELS[basecamp.placement.type].toLowerCase()}.` };
+  }
+  const before = basecamp.evaluation?.score;
+  const asked = intent.args.depth_m ?? null;
+  const done = basecamp.setCover(asked ?? basecamp.cover.maxM);
+  if (!done) return { text: "I could not set the cover on this module." };
+  const { score, coverM, maxM } = done;
+  const label = MODULE_LABELS[basecamp.placement.type].toLowerCase();
+  const lines = [
+    `Covered the ${label} with ${coverM.toFixed(2)} m of regolith.`,
+    done.clamped || asked === null
+      ? `I can only score cover up to ${maxM.toFixed(2)} m: that is as deep as our cited shielding values go${asked === null ? ", so I used that" : `, so I used that instead of ${asked} m`}.`
+      : "",
+    `Dose estimate: ${Math.round(score.doseUnshielded_mSvPerYear ?? 0)} mSv/yr with no cover × ${(score.shieldingFactor ?? 1).toFixed(3)} = ${Math.round(score.doseEstimate_mSvPerYear ?? 0)} mSv/yr.`,
+    `Ground to move: ${Math.round(score.cutFillM3)} m³, of which ${Math.round(score.coverM3 ?? 0)} m³ is the cover (depth × footprint).`,
+    before ? `Grade ${before.grade} → ${score.grade}.` : `Grade ${score.grade}.`,
+  ];
+  lines.push(`Factor from ${shortSource(series.citation)}; an estimate.`);
+  const better = series.points.filter((p) => p.depth_m < coverM && p.factor < (score.shieldingFactor ?? 1)).sort((a, b) => a.factor - b.factor)[0];
+  if (better) lines.push(`Note: the cited value at ${better.depth_m.toFixed(2)} m (× ${better.factor.toFixed(3)}) gives a lower dose than this depth; more regolith is not always less dose in this range.`);
+  const disagrees = otherModelNote(series, coverM, score.shieldingFactor ?? 1);
+  if (disagrees) lines.push(disagrees);
+  return { text: lines.filter(Boolean).join(" ") };
+}
+
 // Runs one intent through the same functions the UI buttons use, and describes the result.
 export function executeIntent(intent: Intent | null, text: string, ctx: ExecuteContext): ChatReply {
   // User pins are read from the words themselves, so they work the same with Grok or the local reader.
@@ -179,6 +215,8 @@ export function executeIntent(intent: Intent | null, text: string, ctx: ExecuteC
       return describeConcept(intent, ctx);
     case "answer":
       return { text: intent.args.text };
+    case "set_cover":
+      return describeCover(intent, ctx);
     default:
       return { text: `I understood "${intent.intent}", but that isn't available in the rover chat yet.` };
   }

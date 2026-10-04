@@ -11,6 +11,11 @@ export function interpretLocally(text: string): Intent | null {
     return { intent: "render_concept", args: {} };
   }
 
+  if (/\b(bury|buried|underground|regolith|cover (it|the)|tunnel (it|this))\b/.test(t)) {
+    const depth = t.match(/(\d+(?:\.\d+)?)\s*(cm|centimet|m\b|met)/);
+    return { intent: "set_cover", args: depth ? { depth_m: Number(depth[1]) * (depth[2].startsWith("c") ? 0.01 : 1) } : {} };
+  }
+
   const destination =
     t.match(/\b(?:to|reach|get to|at)\s+(.+?)[?.!]*$/)?.[1] ??
     t.match(/\b(?:is|are)\s+(.+?)\s+reachable/)?.[1] ??
