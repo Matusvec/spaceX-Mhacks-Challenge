@@ -1,8 +1,23 @@
-node_modules/
-dist/
-.venv/
-__pycache__/
 .env
 .env.*
 !.env.example
-scenes/
+.venv/
+__pycache__/
+node_modules/
+dist/
+# large data lives on Drive / local disk, never in git
+scenes/*
+!scenes/.gitkeep
+/data/
+# training outputs pulled from Colab, model checkpoints, lifted layers (1 GB and growing)
+/runs/
+third_party/
+*.pt
+*.ply
+*.spz
+# screenshots from the capture scripts, the superseded integration patch, deploy staging
+shots/*.png
+shots/*.jpg
+viewer-integration.patch
+.vercel-stage/
+.vercel/

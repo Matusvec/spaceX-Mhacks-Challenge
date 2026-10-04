@@ -56,6 +56,8 @@ scenes/<scene_id>/
 }
 ```
 
+Optional `"splat_surface": { "file": "splat_surface.png", "cell_m": 0.1, "west_m": -11.5, "north_m": 8.4, "z_min_m": -1.9, "z_max_m": 2.2, "estimate": true, "source": "...", "resolution": "10 cm cells" }`: the height of the splat's own surface (`pipelines/data/splat_surface.py`), because the 1 m terrain does not contain the rocks the splat shows. 16-bit grey PNG, row 0 is the north edge, column 0 starts at `west_m`. Pixel 0 means no data; otherwise `z_site = z_min_m + ((pixel - 1) / 65534) * (z_max_m - z_min_m)`. The viewer stands the rover on it where it has data and on the terrain elsewhere.
+
 Terrain heightmap decoding: `z_site = z_min_m + (pixel / 65535) * (z_max_m - z_min_m)`. Pixel (0,0) is the north-west corner. The heightmap covers `size_m`, centered on the site origin.
 
 ## 3. Per-Gaussian layers (`layers.bin` + `layers.json`)

@@ -15,15 +15,21 @@ Read `docs/contracts.md` before writing any code. All components meet at those f
 
 - Web: React + Vite + TypeScript, plain three.js for the canvas, Spark for Gaussian splats. Not React Three Fiber.
 - Backend: Python 3.11, FastAPI, PyTorch with CUDA 12.8 (RTX 5070 is Blackwell, sm_120).
-- Training: Colab notebooks in `pipelines/colab/`, gsplat with the MCMC strategy.
+- Training: gsplat MCMC on a Colab GPU, started from `pipelines/colab/launch.sh`. Read `docs/colab-cli.md` before touching a runtime.
 - Multiplayer: SpacetimeDB TypeScript module in `spacetime/`, generated client bindings used by `apps/web` and `apps/relay`.
 - Relay agent: TypeScript, Relay SDK, in `apps/relay/`.
 
-## Colab notebooks
+## Colab, from the command line
 
-- Mount Google Drive. Write checkpoints and logs to Drive, never only to the runtime disk.
-- Every notebook must be resumable: skip finished steps, resume from the latest checkpoint.
-- Log loss and metrics to a CSV on Drive so progress can be checked from any laptop.
+Agents train with `pipelines/colab/launch.sh`. The Colab website is not part of the loop.
+
+Do not run `colab auth`, `colab drivemount`, `colab repl`, or an unpiped `colab console`. Those wait on a person and the shell will hang.
+
+Do not start login, and do not ask the user to paste an authorization code into chat. If neither `~/.config/colab-cli/token.json` nor `~/.config/gcloud/application_default_credentials.json` exists, stop and tell them to run the scoped `gcloud auth application-default login` in `docs/colab-cli.md` in their own terminal. After one of those files exists, `launch.sh` can open a GPU, upload a COLMAP tree, train, and download checkpoints.
+
+- Checkpoints and the CSV go to Google Drive when `/content/drive` is already mounted. Agents never mount it. `launch.sh pull` also copies them onto this machine, so a finished run is not left only on the VM disk.
+- Resume from the latest checkpoint in the result dir. Skip a run whose CSV already shows the target step count.
+- Log loss to `logs/<run>.csv` (step, loss). When Drive is mounted, the same file is copied there.
 
 ## Definition of done for any feature
 

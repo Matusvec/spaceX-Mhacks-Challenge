@@ -9,12 +9,24 @@ Owner: Matus. Runs on Colab Pro (A100 or H100). Output: `splat.spz` plus the spl
 3. Small files the browser can load quickly.
 4. Correct placement on the terrain, in the `site` frame.
 
-## Step 0: environment (Colab)
+## Step 0: environment (Colab CLI)
 
-- Runtime: A100 or H100, High-RAM.
-- Mount Drive. Working root: `/content/drive/MyDrive/pss/` with `raw/`, `colmap/`, `runs/`, `bundles/`, `logs/`.
-- Install: `pip install gsplat` (match the wheel to the runtime's PyTorch and CUDA; if no prebuilt wheel matches, gsplat compiles its CUDA kernels on first import, which takes a few minutes), plus `pycolmap` or the COLMAP binary, `numpy`, `pillow`, `tyro`.
-- Clone gsplat's repo for `examples/simple_trainer.py`.
+Agents do this from the laptop. The browser is not required after a one-time login. See `docs/colab-cli.md`.
+
+```bash
+pipelines/colab/launch.sh check          # no GPU, no login prompt
+pipelines/colab/launch.sh session        # A100 high-RAM, falls back to T4
+pipelines/colab/launch.sh upload         # local data/colmap/<stop>
+pipelines/colab/launch.sh train          # gsplat MCMC, streams the log
+pipelines/colab/launch.sh pull           # csv + latest checkpoint back to runs/
+pipelines/colab/launch.sh stop
+```
+
+`launch.sh all` runs session, upload, train, pull, and stop.
+
+- Runtime: A100 or H100, high-RAM (`--gpu A100 --high-mem`). If that quota fails, T4.
+- Working root on the VM: `/content/pss/` with `colmap/`, `runs/`, `logs/`. When Drive is already mounted, the same tree is mirrored under `/content/drive/MyDrive/pss/`. Agents do not mount Drive.
+- The trainer clones `nerfstudio-project/gsplat` on the VM and runs `pip install -e .` so `examples/simple_trainer.py` matches that CUDA. First install compiles kernels and takes a few minutes.
 
 ## Step 1: download one stop
 
@@ -50,9 +62,45 @@ def cahv_to_pinhole(C, A, H, V):
 
 Checks before trusting it:
 - `R` should be orthonormal (within about 1e-3). If not, re-orthonormalize with SVD and log the error.
-- The model's pixel units must match the downloaded image size. If the image is downsampled or a subframe, scale and shift `K` using `extended.scaleFactor` and `subframeRect`.
+- The model's pixel units must match the downloaded image size. On this raw feed the CAHV is already in the delivered PNG's pixel grid (a Navcam tile's principal point sits outside the tile, and it shifts by the same step as `subframeRect`). Do not shift `K` a second time.
+- Train on the frames `cahv_to_colmap.py` keeps, not the whole download. Mastcam-Z `ECM` browse PNGs are grayscale; the debayered color product is `EBY` (Analyst's Notebook product list; the same flag used for published Mastcam-Z DOM reconstructions). Drop narrowband and ND filters, horizon frames, and repeat sols of the same aim (keep the sharpest). Do not stitch different pointings into one picture: that throws away the parallax. Navcam tiles of one exposure are a single pose; `cahv_to_colmap.py` (single stop, Mastcam-Z only) leaves them out, `build_scene.py` stitches them back into one frame.
 - Frame: camera models are expressed in a rover or site frame for that position. Images from the same site and drive should agree. If images from different drives don't line up, bring each drive into one frame using the PLACES localization (`data-sources.md`).
-- Ignoring the distortion terms is an approximation. Navcam distortion is moderate; Hazcams are fisheye and need it. Treat these poses as initialization.
+- Ignoring the distortion terms only works for Mastcam-Z at 110 mm. Navcam is CAHVORE type 2, a fisheye: the linear model is hundreds of pixels off at the frame corner. `pipelines/data/cahvore.py` resamples to a true pinhole (stereo epipolar error drops from about 1 px to 0.1 px). Hazcams need the same.
+
+### What was actually built (use this)
+
+One stop is one viewpoint: the mast moves under half a metre, so a single-stop splat is a relief that only looks right from the rover. The rover parked three times around the Cheyava Falls rock (site 55 drive 0, site 55 drive 144, site 56 drive 0; 2.0 m, 7.3 m and 2.6 m from it). The pipeline merges them:
+
+```bash
+python3 pipelines/data/build_scene.py data/raw data/colmap/cheyava_site_v4    # 6 minutes, CPU only
+python3 pipelines/data/check_scene.py data/colmap/cheyava_site_v4             # fails if the stops disagree by more than 3 px
+PSS_DATA=data/colmap/cheyava_site_v4 PSS_RUN=cheyava-site-v4 PSS_CAP_MAX=2500000 pipelines/colab/site.sh push
+PSS_DATA=data/colmap/cheyava_site_v4 PSS_RUN=cheyava-site-v4 PSS_CAP_MAX=2500000 pipelines/colab/site.sh start   # 20 minutes on an A100
+PSS_RUN=cheyava-site-v4 pipelines/colab/site.sh pull
+pipelines/make_mars_bundle.sh runs/cheyava-site-v4/ply/point_cloud_29999.ply data/colmap/cheyava_site_v4       # export, terrain class, tint
+```
+
+Dataset (`pipelines/data/`):
+- Navcam tiles are stitched per exposure and undistorted with the full CAHVORE model. Every colour Mastcam-Z frame aimed at ground within 30 m is used, at any zoom. A frame is kept only where the rover's own stereo measured ground, which removes rover hardware, sky and far hills. The gsplat COLMAP loader has no per-image masks, so each frame is written as rectangular crops of its good area.
+- Mastcam-Z's two camera models disagree by 3 to 4 pixel rows. `stereo.align_right` rotates the right eye until matched points share rows (0.02 px after). Without it dense stereo confirms under 10% of a frame.
+- Poses come from the camera models plus rover attitude and position. No SfM: features do not match across stops (9 to 23 inliers against about 2,900 within a stop). The stops are lined up on their stereo height maps, then on image texture; `check_scene.py` measures the result in pixels.
+- `points3D.txt` is the stereo cloud, so the trainer has depth targets in every image. Navcam gets one white-balance gain to match Mastcam-Z (`colour.py`).
+- Navcam comes from the arrival sol of each stop (arm stowed).
+
+Training (`pipelines/colab/site.sh`, which patches a private copy of gsplat's trainer with `vm_patch_trainer.py`):
+- MCMC with its opacity and scale regularisers off. A Gaussian here is seen by about 3% of the images; with the regularisers on, 80% of the Gaussians died every 100 steps.
+- A needle penalty (longest axis at most twice the middle one). All cameras sit at three spots, so Gaussians stretched along the line of sight look right in training and like spikes from anywhere else.
+- Depth loss on the stereo cloud at ten times gsplat's default weight, with the rendered depth floored at 0.5 m (the stock loss is 1/depth and gives NaN on an uncovered pixel). Positions move ten times slower than default: they start on the stereo surface.
+- No view-dependent colour (SH degree 0), a per-image bilateral grid for exposure, pose optimisation, anti-aliasing, no world normalisation (the splat stays in east-north-up metres).
+- Judge a run with `pipelines/colab/vm_render.py` (orbit, low and top-down views no camera had), not with held-out PSNR: held-out photos sit centimetres from training photos and get no exposure correction, so PSNR stays near 18 dB whether the splat is good or full of spikes.
+
+Known limits of the result: soft from closer than about 2 m (Navcam is 2.5 to 5 mm per pixel there), holes, rover shadows baked in, sparse beyond 9 m (the export crops there). The holes are not where the rover stood (those patches are seen from the other stops and are well filled); they are ground with no stereo starting point or no photo at all, such as the black triangle north of the hero rock.
+
+Tried and rejected, so nobody repeats them:
+
+- **Seeding the gaps** (`build_scene.FILL`, dataset v5): empty 10 cm cells fell from 11.3% to 7.1%, but the viewer showed flat blank patches and more dark specks. Off by default.
+- **A fourth stop** (site 55 drive 340, 16 m east): it does not register to the other three (texture correlation 0.02, where the others reach 0.18 and 0.61), and `check_scene.py` refuses the dataset.
+- **More Gaussians and steps** (3M, 40k) and **per-frame exposure gains without the colour grid** (dataset v3): no gain, and frame-shaped patches, respectively.
 
 ## Step 3: refine with COLMAP
 
