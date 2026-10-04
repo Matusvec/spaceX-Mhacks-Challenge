@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+node_modules/
+dist/
+# large data lives on Drive / local disk, never in git
+scenes/*
+!scenes/.gitkeep
+data/
+third_party/
+*.pt
+*.ply
+*.spz

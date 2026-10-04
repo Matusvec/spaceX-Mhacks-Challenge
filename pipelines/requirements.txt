@@ -1,0 +1,13 @@
+# Local pipeline env (RTX 5070, Blackwell needs cu128+). Install:
+#   uv venv --python 3.11 .venv
+#   uv pip install -r pipelines/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
+torch
+torchvision
+gsplat
+pycolmap
+numpy
+pillow
+opencv-python-headless
+scipy
+tyro
+tqdm
