@@ -23,6 +23,19 @@ export function decodeHeightfield(png: ArrayBuffer, terrain: SceneManifest["terr
   return { cols: image.width, rows: image.height, sizeM: terrain.size_m, heights };
 }
 
+export function cellSizeM(field: Heightfield): number {
+  return field.sizeM[0] / (field.cols - 1);
+}
+
+// Index of the nearest heightfield cell to site (x, y), or -1 outside the terrain.
+export function nearestCellIndex(field: Heightfield, x: number, y: number): number {
+  const [width, depth] = field.sizeM;
+  const col = Math.round(((x + width / 2) / width) * (field.cols - 1));
+  const row = Math.round(((depth / 2 - y) / depth) * (field.rows - 1));
+  if (col < 0 || row < 0 || col >= field.cols || row >= field.rows) return -1;
+  return row * field.cols + col;
+}
+
 // Bilinear height at site (x east, y north), or null outside the terrain.
 export function sampleHeight(field: Heightfield, x: number, y: number): number | null {
   const [width, depth] = field.sizeM;

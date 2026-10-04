@@ -1,6 +1,10 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { SparkRenderer, type SplatMesh } from "@sparkjsdev/spark";
+import type { ModuleType } from "../contracts";
+import { createModuleMesh } from "../modules/library";
+import type { CandidateSite, SuitabilityGrid } from "../modules/siteSearch";
+import { createSiteMarkers, createSuitabilityOverlay } from "./basecampOverlay";
 import { sampleHeight } from "./heightfield";
 import type { LoadedBundle } from "./loadBundle";
 import { pickSitePoint } from "./picking";
@@ -11,6 +15,21 @@ import { createTerrainMesh } from "./terrain";
 export type HoverInfo = { x: number; y: number; z: number } | null;
 
 export type SplatInfo = { count: number; sizeM: [number, number, number] };
+
+export type ModuleView = { type: ModuleType; x: number; y: number; z: number; rotationZDeg: number };
+
+function disposeObject(root: THREE.Object3D): void {
+  root.traverse((object) => {
+    if (object instanceof THREE.Mesh) {
+      object.geometry.dispose();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        (material as THREE.MeshBasicMaterial).map?.dispose();
+        material.dispose();
+      }
+    }
+  });
+}
 
 // Owns the three.js renderer, camera, and the site-frame root that holds the scene.
 export class SceneRoot {
@@ -29,6 +48,12 @@ export class SceneRoot {
   private readonly splatPivot = new THREE.Group();
   private splat: SplatMesh | null = null;
   private splatLoadId = 0;
+  private readonly basecampRoot = new THREE.Group();
+  private suitability: THREE.Mesh | null = null;
+  private siteMarkers: THREE.Group | null = null;
+  private moduleMesh: THREE.Group | null = null;
+  private placeHandler: ((x: number, y: number) => void) | null = null;
+  private placing = false;
 
   constructor(
     private readonly container: HTMLElement,
@@ -60,8 +85,12 @@ export class SceneRoot {
     this.resizeObserver.observe(container);
     this.resize();
 
-    this.renderer.domElement.addEventListener("pointermove", this.handlePointerMove);
-    this.renderer.domElement.addEventListener("pointerleave", this.handlePointerLeave);
+    const canvas = this.renderer.domElement;
+    canvas.addEventListener("pointerdown", this.handlePointerDown);
+    canvas.addEventListener("pointermove", this.handlePointerMove);
+    canvas.addEventListener("pointerup", this.handlePointerUp);
+    canvas.addEventListener("pointercancel", this.handlePointerUp);
+    canvas.addEventListener("pointerleave", this.handlePointerLeave);
     this.renderer.setAnimationLoop(() => {
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
@@ -73,7 +102,7 @@ export class SceneRoot {
     this.clearSiteRoot();
     this.bundle = bundle;
     this.terrain = createTerrainMesh(bundle.heightfield, bundle.textureUrl);
-    this.siteRoot.add(this.terrain, createPinMarkers(bundle.pins), this.splatPivot);
+    this.siteRoot.add(this.terrain, createPinMarkers(bundle.pins), this.splatPivot, this.basecampRoot);
     this.frameCamera(bundle.heightfield.sizeM);
   }
 
@@ -112,28 +141,89 @@ export class SceneRoot {
     if (!this.splat) return;
     this.scene.updateMatrixWorld(true);
     const box = this.splat.getBoundingBox().applyMatrix4(this.splat.matrixWorld);
-    const center = box.getCenter(new THREE.Vector3());
     const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 0.1);
-    const distance = radius * 2.5;
-    const direction = this.camera.position.clone().sub(this.controls.target).normalize();
-    this.camera.near = Math.min(0.5, distance / 100);
-    this.camera.updateProjectionMatrix();
-    this.controls.target.copy(center);
-    this.camera.position.copy(center).addScaledVector(direction, distance);
-    this.controls.update();
+    this.lookAtWorld(box.getCenter(new THREE.Vector3()), radius * 2.5);
+  }
+
+  setSuitability(grid: SuitabilityGrid | null): void {
+    if (this.suitability) {
+      this.basecampRoot.remove(this.suitability);
+      (this.suitability.material as THREE.MeshBasicMaterial).map?.dispose();
+      (this.suitability.material as THREE.Material).dispose();
+      this.suitability = null;
+    }
+    if (grid && this.terrain) {
+      this.suitability = createSuitabilityOverlay(this.terrain.geometry, grid);
+      this.basecampRoot.add(this.suitability);
+    }
+  }
+
+  setSiteMarkers(sites: CandidateSite[]): void {
+    if (this.siteMarkers) {
+      this.basecampRoot.remove(this.siteMarkers);
+      disposeObject(this.siteMarkers);
+      this.siteMarkers = null;
+    }
+    const field = this.bundle?.heightfield;
+    if (!field || sites.length === 0) return;
+    this.siteMarkers = createSiteMarkers(sites.map((s) => ({ ...s, z: sampleHeight(field, s.x, s.y) ?? 0 })));
+    this.basecampRoot.add(this.siteMarkers);
+  }
+
+  setModule(module: ModuleView | null): void {
+    if (this.moduleMesh && (!module || this.moduleMesh.userData.type !== module.type)) {
+      this.basecampRoot.remove(this.moduleMesh);
+      disposeObject(this.moduleMesh);
+      this.moduleMesh = null;
+    }
+    if (!module || !this.bundle) return;
+    if (!this.moduleMesh) {
+      this.moduleMesh = createModuleMesh(module.type, this.bundle.manifest.body);
+      this.moduleMesh.userData.type = module.type;
+      this.basecampRoot.add(this.moduleMesh);
+    }
+    this.moduleMesh.position.set(module.x, module.y, module.z);
+    this.moduleMesh.rotation.z = (module.rotationZDeg * Math.PI) / 180;
+  }
+
+  // While a handler is set, clicking or dragging on the terrain places instead of orbiting.
+  setPlaceHandler(handler: ((x: number, y: number) => void) | null): void {
+    this.placeHandler = handler;
+    this.placing = false;
+    this.controls.enabled = !handler;
+    this.renderer.domElement.style.cursor = handler ? "crosshair" : "";
+  }
+
+  flyToSite(x: number, y: number, z: number, distanceM: number): void {
+    this.scene.updateMatrixWorld(true);
+    this.lookAtWorld(this.siteRoot.localToWorld(new THREE.Vector3(x, y, z)), distanceM);
   }
 
   dispose(): void {
     this.renderer.setAnimationLoop(null);
     this.resizeObserver.disconnect();
-    this.renderer.domElement.removeEventListener("pointermove", this.handlePointerMove);
-    this.renderer.domElement.removeEventListener("pointerleave", this.handlePointerLeave);
+    const canvas = this.renderer.domElement;
+    canvas.removeEventListener("pointerdown", this.handlePointerDown);
+    canvas.removeEventListener("pointermove", this.handlePointerMove);
+    canvas.removeEventListener("pointerup", this.handlePointerUp);
+    canvas.removeEventListener("pointercancel", this.handlePointerUp);
+    canvas.removeEventListener("pointerleave", this.handlePointerLeave);
     this.controls.dispose();
     this.clearSplat();
     this.clearSiteRoot();
     this.spark.dispose();
     this.renderer.dispose();
-    this.renderer.domElement.remove();
+    canvas.remove();
+  }
+
+  // Keeps the current viewing direction and moves the camera to look at `target` from `distance`.
+  private lookAtWorld(target: THREE.Vector3, distance: number): void {
+    const direction = this.camera.position.clone().sub(this.controls.target).normalize();
+    this.camera.near = Math.min(0.5, distance / 100);
+    this.camera.updateProjectionMatrix();
+    this.controls.target.copy(target);
+    this.camera.position.copy(target).addScaledVector(direction, distance);
+    this.controls.update();
   }
 
   // Looks at the site origin from the south, so north is up the screen and east is right.
@@ -163,27 +253,41 @@ export class SceneRoot {
   }
 
   private clearSiteRoot(): void {
-    this.siteRoot.traverse((object) => {
-      if (object instanceof THREE.Mesh) {
-        object.geometry.dispose();
-        const materials = Array.isArray(object.material) ? object.material : [object.material];
-        for (const material of materials) {
-          (material as THREE.MeshStandardMaterial).map?.dispose();
-          material.dispose();
-        }
-      }
-    });
+    disposeObject(this.siteRoot);
+    this.basecampRoot.clear();
     this.siteRoot.clear();
+    this.suitability = null;
+    this.siteMarkers = null;
+    this.moduleMesh = null;
     this.terrain = null;
     this.bundle = null;
   }
 
+  private pickTerrain(event: PointerEvent): THREE.Vector3 | null {
+    if (!this.terrain) return null;
+    return pickSitePoint(event, this.renderer.domElement, this.camera, this.terrain, this.siteRoot);
+  }
+
+  private readonly handlePointerDown = (event: PointerEvent) => {
+    if (!this.placeHandler || event.button !== 0) return;
+    const point = this.pickTerrain(event);
+    if (!point) return;
+    this.placing = true;
+    this.renderer.domElement.setPointerCapture(event.pointerId);
+    this.placeHandler(point.x, point.y);
+  };
+
   private readonly handlePointerMove = (event: PointerEvent) => {
-    if (!this.terrain || !this.bundle) return;
-    const point = pickSitePoint(event, this.renderer.domElement, this.camera, this.terrain, this.siteRoot);
+    if (!this.bundle) return;
+    const point = this.pickTerrain(event);
     if (!point) return this.onHover(null);
+    if (this.placing && this.placeHandler) this.placeHandler(point.x, point.y);
     const z = sampleHeight(this.bundle.heightfield, point.x, point.y) ?? point.z;
     this.onHover({ x: point.x, y: point.y, z });
+  };
+
+  private readonly handlePointerUp = () => {
+    this.placing = false;
   };
 
   private readonly handlePointerLeave = () => this.onHover(null);

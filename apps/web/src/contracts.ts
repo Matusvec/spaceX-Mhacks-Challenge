@@ -25,6 +25,22 @@ export type SceneManifest = {
   sources: Source[];
 };
 
+export type ModuleType = "habitat" | "greenhouse_dome" | "tunnel" | "landing_pad" | "solar_field";
+
+export type Score = {
+  grade: number;
+  slopeMeanDeg: number;
+  slopeMaxDeg: number;
+  flatnessM: number;
+  cutFillM3: number;
+  distToScienceM: number | null;
+  roverReachable: boolean | null;
+  illuminationPct?: number;
+  earthVisiblePct?: number;
+  doseEstimate_mSvPerYear?: number;
+  notes: string[];
+};
+
 export type SciencePin = {
   id: number;
   name: string;

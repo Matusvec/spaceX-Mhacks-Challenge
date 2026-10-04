@@ -2,7 +2,9 @@ import { useEffect, useState, type DragEvent } from "react";
 import type { HoverInfo, SceneRoot } from "./scene/SceneRoot";
 import { bundleFileUrl, loadBundle, type LoadedBundle } from "./scene/loadBundle";
 import { isSplatFileName, SPLAT_EXTENSIONS } from "./scene/splat";
+import { BasecampPanel } from "./ui/BasecampPanel";
 import { ScenePanel } from "./ui/ScenePanel";
+import { useBasecamp } from "./ui/useBasecamp";
 import { SplatPanel } from "./ui/SplatPanel";
 import { useSplatLoader } from "./ui/useSplatLoader";
 import { ViewerCanvas } from "./ui/ViewerCanvas";
@@ -20,8 +22,10 @@ export function App() {
   const [hover, setHover] = useState<HoverInfo>(null);
   const [sceneRoot, setSceneRoot] = useState<SceneRoot | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [displayedBundle, setDisplayedBundle] = useState<LoadedBundle | null>(null);
   const splat = useSplatLoader(sceneRoot);
   const { load: loadSplat, fail: failSplat } = splat;
+  const basecamp = useBasecamp(sceneRoot, displayedBundle);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,8 +40,10 @@ export function App() {
   }, [sceneId]);
 
   useEffect(() => {
+    setDisplayedBundle(null);
     if (!sceneRoot || !bundle) return;
     sceneRoot.setBundle(bundle);
+    setDisplayedBundle(bundle);
     const splatFile = bundle.manifest.splat?.file;
     if (splatFile) {
       loadSplat({ kind: "bundle", url: bundleFileUrl(bundle.manifest.scene_id, splatFile), name: splatFile });
@@ -95,6 +101,7 @@ export function App() {
         )}
         {dragging && <div className="drop-overlay">Drop a {SPLAT_EXTENSIONS.join(" / ")} splat to preview it</div>}
       </main>
+      <BasecampPanel basecamp={basecamp} />
     </div>
   );
 }
