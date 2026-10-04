@@ -104,7 +104,39 @@ const rover = table(
   },
 );
 
-const spacetimedb = schema({ user, cursor, pin, placedModule, rover, organisation, organisationSecret, sceneAccess, member, admin });
+// Team chat: people talking to people in a scene (not the rover assistant). The newest 100 per scene are kept.
+const chatMessage = table(
+  { name: 'chat_message', public: true },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    sceneId: t.string().index('btree'),
+    author: t.identity(),
+    name: t.string(),
+    color: t.string(),
+    text: t.string(),
+    sentAt: t.timestamp(),
+  },
+);
+
+// Shared concept renders: the picture (a downscaled JPEG data URL) travels in the row, with the camera pose
+// it was made from, so teammates can open the same view. The newest 12 per scene are kept.
+const concept = table(
+  { name: 'concept', public: true },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    sceneId: t.string().index('btree'),
+    author: t.identity(),
+    authorName: t.string(),
+    renderId: t.string(),
+    idea: t.string(),
+    prompt: t.string(),
+    poseJson: t.string(),
+    image: t.string(),
+    createdAt: t.timestamp(),
+  },
+);
+
+const spacetimedb = schema({ user, cursor, pin, placedModule, rover, organisation, organisationSecret, sceneAccess, member, admin, chatMessage, concept });
 export default spacetimedb;
 
 export type Ctx = ReducerCtx<InferSchema<typeof spacetimedb>>;

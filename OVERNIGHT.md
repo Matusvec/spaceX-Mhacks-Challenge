@@ -96,6 +96,12 @@ the patch for Claire is on hold until they settle. Backups of that tree: scratch
 
 ## Done
 
+- 11:09 **Live at https://planetary-scene-studio.vercel.app** (Vercel, project planetary-scene-studio; redeploy with
+  `scripts/deploy_vercel.sh --deploy` in pss-web-main, backend on :8000 running). Landing page with one access
+  code (codes are in `~/.config/pss-studio/org-codes-pss-studio-mhacks.env`, not in the repo), "Your scenes" per
+  organisation with who is live, in-tab Mars/Moon switch, restyle (Space Grotesk, no pills, regrouped panels),
+  concept render swipe in the viewer, team chat and shared concept renders through SpacetimeDB. Everything is
+  on `main`. Colab VM stopped at 10:40.
 - 10:25 **Grok is live with a real key: text, Imagine and Voice all PASS** (`smoke_grok.py`). One real concept
   render on our own captured Mars view took 11.8 s and kept the terrain and camera angle while adding three
   domes, tunnels, solar panels and a pad (`docs/figures/grok_imagine_view_vs_render.jpg`, looked at). This is

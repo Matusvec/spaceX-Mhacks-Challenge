@@ -59,13 +59,13 @@ export function SharedPanel(props: Props) {
   const [naming, setNaming] = useState(() => isDefaultName(shared.profile.name));
   const live = shared.status === "live";
   const count = shared.people.length;
-  const chip = live ? `live, ${count} ${count === 1 ? "person" : "people"}` : shared.status === "connecting" ? "connecting…" : "offline: access not checked, not shared";
+  const chip = live ? `live ${count}` : shared.status === "connecting" ? "connecting…" : "offline: access not checked, not shared";
 
   return (
     <section className="shared">
       <h2>Shared session</h2>
       <span className={`chip chip-${shared.status}`} title={`SpacetimeDB ${SPACETIME_MODULE} at ${SPACETIME_URI}`}>
-        ● {chip}
+        {chip}
       </span>
       {!live && <p className="muted small">Pins and modules stay on this computer until the session server is reachable.</p>}
       {shared.error && <p className="error small">{shared.error}</p>}

@@ -21,7 +21,14 @@ export type SharedRover = {
   mine: boolean;
 };
 
-export type Snapshot = { people: Person[]; pins: UserPin[]; modules: SharedModule[]; rover: SharedRover | null };
+// One line of the team chat (people to people; not the rover assistant).
+export type ChatLine = { id: bigint; name: string; color: string; text: string; sentAtMs: number; mine: boolean };
+
+// A concept render someone shared: the picture is a JPEG data URL carried in the row itself.
+export type SharedConcept = { id: bigint; renderId: string; authorName: string; mine: boolean; idea: string; prompt: string; poseJson: string; image: string; createdAtMs: number };
+export type ConceptDraft = { renderId: string; idea: string; prompt: string; poseJson: string; image: string };
+
+export type Snapshot = { people: Person[]; pins: UserPin[]; modules: SharedModule[]; rover: SharedRover | null; chat: ChatLine[]; concepts: SharedConcept[] };
 
 export type ModuleDraft = { type: ModuleType; position: Vec3; rotationZDeg: number; scoreJson: string };
 export type CursorPose = { position: Vec3; camera: Vec3; direction: Vec3 };
@@ -38,4 +45,7 @@ export type SharedActions = {
   roverArrived(seq: number): void;
   resetRover(): void;
   setCursor(pose: CursorPose | null): void;
+  sendChat(text: string): void;
+  shareConcept(draft: ConceptDraft): void;
+  removeConcept(id: bigint): void;
 };

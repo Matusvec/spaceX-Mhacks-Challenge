@@ -1,6 +1,6 @@
 # Planetary Scene Studio: Devpost draft
 
-Live: https://planetary-scene-studio.vercel.app (Grok features need the team passcode)
+Live: https://planetary-scene-studio.vercel.app (needs an access code; give judges the mission-control one)
 Repo: https://github.com/Matusvec/spaceX-Mhacks-Challenge
 
 Every number below is from our own bundle or a cited source. Lines marked TEAM are for a teammate to fill in.
@@ -19,7 +19,7 @@ From orbit, the best pictures of Mars are 25 cm per pixel and the best elevation
 - **Drive a rover.** A six-wheel rocker-bogie rover follows the ground, including the splat's own rocks. Double-click anywhere, or tell it in chat or by voice. Fly the camera, follow the rover, or look through its mast camera.
 - **Imagine the base with Grok.** Describe an idea; we send your current 3D view to Grok Imagine and it paints the base onto that exact terrain and camera angle. Swipe between the real view and the concept.
 - **Talk to it.** Chat and voice go through Grok to a fixed set of actions; replies about science come only from cited data.
-- **Do it together.** Sign in with your organisation; you see only your scenes. Cursors, pins, modules and rover drives sync live through SpacetimeDB.
+- **Do it together.** One access code on the landing page signs you in to your organisation; you see only your scenes, and who is live in each. Cursors, pins, modules, rover drives, a team chat and each other's concept renders sync live through SpacetimeDB.
 - **Moon physics.** Illumination and Earth visibility computed from LOLA terrain and JPL ephemerides, a radiation dose estimate, and a regolith shielding slider built on published values (the curve is not monotonic, and we show that).
 
 ## How we built it
@@ -28,7 +28,7 @@ From orbit, the best pictures of Mars are 25 cm per pixel and the best elevation
 - **Semantic layers.** A SegFormer model trained on AI4Mars labels terrain in each rover photo; SAM regions embedded with CLIP give the search clusters. Both are lifted onto the Gaussians.
 - **Viewer.** React, TypeScript, plain three.js, Spark for the splat.
 - **Grok.** Imagine image-edit API on the captured view, Voice API for speech-to-text and text-to-speech, text API for chat intents. Keys stay on the server.
-- **SpacetimeDB.** One TypeScript module holds presence, pins, modules, rover state, organisations and scene access; reducers enforce who may touch which scene.
+- **SpacetimeDB.** One TypeScript module holds presence, pins, modules, rover state, team chat, shared concept renders (the pictures live in rows), organisations and scene access; reducers enforce who may touch which scene. There is no other database.
 - **Hosting.** Static app and scenes on Vercel with one small function for the Grok calls; all 3D runs in the browser.
 - TEAM: how Cursor and Grok Bot were used for planning and building.
 
@@ -54,7 +54,7 @@ From orbit, the best pictures of Mars are 25 cm per pixel and the best elevation
 
 ## What's next
 
-More rover stops stitched along the traverse, email login through SpacetimeAuth, shared concept renders, and Mastcam-Z multispectral layers.
+More rover stops stitched along the traverse, email login through SpacetimeAuth, and Mastcam-Z multispectral layers.
 
 ## Built with
 

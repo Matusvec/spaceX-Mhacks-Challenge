@@ -725,3 +725,312 @@ button.scene-card:hover {
   margin-right: 5px;
   border-radius: 50%;
 }
+
+/* ---- Look: one typeface pairing, plain status text, flat controls --------------------------------- */
+:root {
+  --accent: #ffb454;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+}
+
+body button,
+body select,
+body input,
+body textarea {
+  font-family: inherit;
+}
+
+/* Numbers, coordinates and data labels are set in the monospace face. */
+body dd,
+body .readout,
+body .legend,
+body .chat-tag,
+body .camera-bar p,
+body .scorecard .grade,
+body .sites button .muted {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+body .scorecard .grade {
+  font-size: 34px;
+}
+
+/* Type scale: 20 px titles, 14 px text, 12 px notes, 11 px section labels. */
+body .panel h1 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+body .panel h2,
+body .eyebrow,
+body details.fold > summary {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+body .eyebrow {
+  color: var(--accent);
+}
+
+/* Section headers that fold: a rule above, the name, and what the section is for. */
+body details.fold {
+  margin-top: 16px;
+  border-top: 1px solid #1f232d;
+}
+
+body details.fold > summary {
+  margin: 12px 0 8px;
+  color: #c9cdd6;
+  list-style: none;
+}
+
+body details.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+body details.fold > summary::before {
+  content: "+";
+  display: inline-block;
+  width: 14px;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+body details.fold[open] > summary::before {
+  content: "–";
+}
+
+/* A folded section names itself, so the wrapped panel's own first heading is not repeated. */
+body details.fold.single > section:first-of-type > h2:first-child {
+  display: none;
+}
+
+body .panel details.fold > section + section,
+body .panel details.fold > section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* Status as plain text with a small square marker: no capsules, no glow. */
+body .chip,
+body .grok-status,
+body .via {
+  display: inline-block;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: #8a909c;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+body .chip::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  background: currentColor;
+}
+
+body .chip-live {
+  color: #e8e6e3;
+}
+
+body .chip-live::before {
+  background: var(--accent);
+}
+
+body .grok-status.ready,
+body .via-grok {
+  color: #c9cdd6;
+}
+
+body .shell-bar .chip {
+  margin-left: 12px;
+}
+
+/* Flat controls: squared corners, one primary style. */
+body button,
+body select,
+body input,
+body textarea,
+body .readout,
+body .chat,
+body .chat-toggle,
+body .chat-message,
+body dialog.sources,
+body .concept-bar,
+body .concept-side,
+body .concept-viewer-body,
+body .camera-bar p,
+body .drop-overlay {
+  border-radius: 2px;
+}
+
+body button.concept-go,
+body .chat-input button[type="submit"]:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #11141b;
+  font-weight: 600;
+}
+
+body button.concept-go:disabled {
+  opacity: 0.5;
+}
+
+body button.active,
+body .camera-bar button.active {
+  border-color: var(--accent);
+  background: #1a1f29;
+  color: var(--accent);
+}
+
+body .panel a,
+body .panel summary,
+body button.link {
+  color: #c9cdd6;
+}
+
+body .panel details:not(.fold) > summary {
+  color: var(--accent);
+}
+
+body .grok-status[class],
+body .via[class] {
+  background: none;
+}
+
+/* Cards and dialogs: the same near-square corners as the controls. */
+body .drop-overlay,
+body .chat,
+body .chat-message,
+body dialog.sources,
+body .home-card,
+body .landing-card,
+body .landing-card input {
+  border-radius: 3px;
+}
+
+/* Team chat (people to people, SpacetimeDB): layout only. */
+.panel ol.team-chat-messages {
+  max-height: 220px;
+  margin: 6px 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.team-chat-line {
+  margin-bottom: 6px;
+}
+
+.team-chat-author {
+  font-weight: 600;
+}
+
+.team-chat-input {
+  display: flex;
+  gap: 6px;
+}
+
+.team-chat-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid #2c3240;
+  border-radius: 6px;
+  background: #1a1f29;
+  color: #e8e6e3;
+  font: inherit;
+}
+
+/* Team chat (people to people), in the People section. */
+.team-chat > h2 {
+  margin-top: 16px;
+}
+
+.team-chat-messages {
+  max-height: 180px;
+  margin: 8px 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border-top: 1px solid #1f232d;
+  border-bottom: 1px solid #1f232d;
+}
+
+.team-chat-line {
+  margin: 0;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.team-chat-line + .team-chat-line {
+  border-top: 1px solid #171b23;
+}
+
+.team-chat-author {
+  font-weight: 600;
+}
+
+.team-chat-time {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.team-chat-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.team-chat-line.mine .team-chat-text {
+  color: #c9cdd6;
+}
+
+.team-chat-input {
+  display: flex;
+  gap: 6px;
+}
+
+.team-chat-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid #2c3240;
+  background: #0b0d12;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+/* Concepts shared by teammates, in the Concepts list. */
+.shared-concept-author {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #8a909c;
+}
+
+.team-chat-messages:empty {
+  display: none;
+}
+
+/* Every text field and menu gets the same near-square corners, whatever rule styled it first. */
+body .panel input,
+body .panel select,
+body .panel textarea,
+body .chat-input input,
+body .shell-bar select,
+body .concept-idea {
+  border-radius: 2px;
+}

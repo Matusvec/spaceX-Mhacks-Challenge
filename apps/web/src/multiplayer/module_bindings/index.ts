@@ -43,12 +43,15 @@ import HideCursorReducer from "./hide_cursor_reducer";
 import JoinReducer from "./join_reducer";
 import MoveModuleReducer from "./move_module_reducer";
 import PlaceModuleReducer from "./place_module_reducer";
+import RemoveConceptReducer from "./remove_concept_reducer";
 import RemovePinReducer from "./remove_pin_reducer";
 import RenamePinReducer from "./rename_pin_reducer";
 import ResetRoverReducer from "./reset_rover_reducer";
 import RoverArrivedReducer from "./rover_arrived_reducer";
+import SendChatReducer from "./send_chat_reducer";
 import SetModuleScoreReducer from "./set_module_score_reducer";
 import SetSceneReducer from "./set_scene_reducer";
+import ShareConceptReducer from "./share_concept_reducer";
 import SignInReducer from "./sign_in_reducer";
 import SignOutReducer from "./sign_out_reducer";
 import UpdateCursorReducer from "./update_cursor_reducer";
@@ -56,6 +59,8 @@ import UpdateCursorReducer from "./update_cursor_reducer";
 // Import all procedure arg schemas
 
 // Import all table schema definitions
+import ChatMessageRow from "./chat_message_table";
+import ConceptRow from "./concept_table";
 import CursorRow from "./cursor_table";
 import MemberRow from "./member_table";
 import MyScenesRow from "./my_scenes_table";
@@ -69,6 +74,34 @@ import UserRow from "./user_table";
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
+  chatMessage: __table({
+    name: 'chat_message',
+    indexes: [
+      { accessor: 'id', name: 'chat_message_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'sceneId', name: 'chat_message_scene_id_idx_btree', algorithm: 'btree', columns: [
+        'sceneId',
+      ] },
+    ],
+    constraints: [
+      { name: 'chat_message_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ChatMessageRow),
+  concept: __table({
+    name: 'concept',
+    indexes: [
+      { accessor: 'id', name: 'concept_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'sceneId', name: 'concept_scene_id_idx_btree', algorithm: 'btree', columns: [
+        'sceneId',
+      ] },
+    ],
+    constraints: [
+      { name: 'concept_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ConceptRow),
   cursor: __table({
     name: 'cursor',
     indexes: [
@@ -172,12 +205,15 @@ const reducersSchema = __reducers(
   __reducerSchema("join", JoinReducer),
   __reducerSchema("move_module", MoveModuleReducer),
   __reducerSchema("place_module", PlaceModuleReducer),
+  __reducerSchema("remove_concept", RemoveConceptReducer),
   __reducerSchema("remove_pin", RemovePinReducer),
   __reducerSchema("rename_pin", RenamePinReducer),
   __reducerSchema("reset_rover", ResetRoverReducer),
   __reducerSchema("rover_arrived", RoverArrivedReducer),
+  __reducerSchema("send_chat", SendChatReducer),
   __reducerSchema("set_module_score", SetModuleScoreReducer),
   __reducerSchema("set_scene", SetSceneReducer),
+  __reducerSchema("share_concept", ShareConceptReducer),
   __reducerSchema("sign_in", SignInReducer),
   __reducerSchema("sign_out", SignOutReducer),
   __reducerSchema("update_cursor", UpdateCursorReducer),

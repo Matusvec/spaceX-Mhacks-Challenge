@@ -148,7 +148,7 @@ export function HomeScreen({ account, offlineSceneIds, denied, onOpen }: Props) 
                     <span className="muted">nobody here right now</span>
                   ) : (
                     <>
-                      <span className="chip chip-live">● {liveIn(id).length} live</span>
+                      <span className="chip chip-live">{liveIn(id).length} live</span>
                       {liveIn(id).map((person) => (
                         <span key={person.id} className="live-person">
                           <span className="dot" style={{ background: person.color }} />

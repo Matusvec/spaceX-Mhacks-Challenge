@@ -12,7 +12,7 @@ export function BasecampPanel({ basecamp, concept }: { basecamp: Basecamp; conce
 
   return (
     <section>
-      <p className="eyebrow">Base camp</p>
+      <p className="eyebrow">Plan a base</p>
       <h1>Where to build</h1>
 
       <label className="field">

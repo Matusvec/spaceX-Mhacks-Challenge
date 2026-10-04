@@ -15,6 +15,31 @@ export const Admin = __t.object("Admin", {
 });
 export type Admin = __Infer<typeof Admin>;
 
+export const ChatMessage = __t.object("ChatMessage", {
+  id: __t.u64(),
+  sceneId: __t.string(),
+  author: __t.identity(),
+  name: __t.string(),
+  color: __t.string(),
+  text: __t.string(),
+  sentAt: __t.timestamp(),
+});
+export type ChatMessage = __Infer<typeof ChatMessage>;
+
+export const Concept = __t.object("Concept", {
+  id: __t.u64(),
+  sceneId: __t.string(),
+  author: __t.identity(),
+  authorName: __t.string(),
+  renderId: __t.string(),
+  idea: __t.string(),
+  prompt: __t.string(),
+  poseJson: __t.string(),
+  image: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type Concept = __Infer<typeof Concept>;
+
 export const Cursor = __t.object("Cursor", {
   identity: __t.identity(),
   sceneId: __t.string(),

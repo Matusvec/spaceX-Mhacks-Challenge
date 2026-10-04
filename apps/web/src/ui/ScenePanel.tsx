@@ -1,13 +1,15 @@
+import type { ReactNode } from "react";
 import type { LoadedBundle } from "../scene/loadBundle";
 
 type Props = {
+  children?: ReactNode; // the Layers section, shown between the scene facts and the pins
   bundle: LoadedBundle;
   presentation: boolean;
   onPresentation: (on: boolean) => void;
   onDrive?: (target: { x: number; y: number; label: string }) => void;
 };
 
-export function ScenePanel({ bundle, presentation, onPresentation, onDrive }: Props) {
+export function ScenePanel({ children, bundle, presentation, onPresentation, onDrive }: Props) {
   const { manifest, pins } = bundle;
   const [width, depth] = manifest.terrain.size_m;
 
@@ -16,7 +18,6 @@ export function ScenePanel({ bundle, presentation, onPresentation, onDrive }: Pr
       <p className="eyebrow">{manifest.body === "mars" ? "Mars" : "Moon"}</p>
       <h1>{manifest.title}</h1>
 
-      <h2>Terrain</h2>
       <dl>
         <dt>Extent</dt>
         <dd>
@@ -30,20 +31,11 @@ export function ScenePanel({ bundle, presentation, onPresentation, onDrive }: Pr
         </dd>
       </dl>
 
-      <h2>Presentation</h2>
-      <label className="checkbox">
-        <input type="checkbox" checked={presentation} onChange={(e) => onPresentation(e.target.checked)} />
-        Presentation fill
-      </label>
-      <p className="muted small">
-        Real: {manifest.splat ? "splat (rover photos), " : ""}terrain and image (orbit). Cosmetic: sky
-        {manifest.body === "mars" ? ", haze" : ""}, ground beyond the window{manifest.splat ? ", soft splat edge" : ""}, fine
-        grain. Off shows only the data.
-      </p>
+      {children}
 
       {pins.length > 0 && (
-        <>
-          <h2>Pins</h2>
+        <details className="fold" open>
+          <summary>Pins and findings</summary>
           <ul>
             {pins.map((pin) => (
               <li key={pin.id}>
@@ -80,8 +72,20 @@ export function ScenePanel({ bundle, presentation, onPresentation, onDrive }: Pr
               </li>
             ))}
           </ul>
-        </>
+        </details>
       )}
+      <details className="fold">
+        <summary>Display · real and cosmetic</summary>
+      <label className="checkbox">
+        <input type="checkbox" checked={presentation} onChange={(e) => onPresentation(e.target.checked)} />
+        Presentation fill
+      </label>
+      <p className="muted small">
+        Real: {manifest.splat ? "splat (rover photos), " : ""}terrain and image (orbit). Cosmetic: sky
+        {manifest.body === "mars" ? ", haze" : ""}, ground beyond the window{manifest.splat ? ", soft splat edge" : ""}, fine
+        grain. Off shows only the data.
+      </p>
+      </details>
     </section>
   );
 }

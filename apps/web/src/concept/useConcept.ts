@@ -76,7 +76,12 @@ export function useConcept(sceneRoot: SceneRoot | null, manifest: SceneManifest 
     }
   }, []);
 
+  // Multiplayer (multiplayer/useSharedConcepts.ts): a teammate's shared render joins this session's list.
+  // It is not saved to this browser's gallery; it comes back from the shared table on the next visit.
+  const adopt = useCallback((render: ConceptRender) => setRenders((old) => (old.some((r) => r.id === render.id) ? old : [...old, render])), []);
+
   return {
+    adopt,
     available: hasBackend,
     ready: sceneRoot !== null && sceneId !== null,
     renders,

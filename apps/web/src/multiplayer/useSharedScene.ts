@@ -7,7 +7,7 @@ import type { ConnectionStatus, CursorPose, PeerCursor, SharedActions, Snapshot 
 const COLORS = ["#ff9f43", "#ff6b9d", "#b388ff", "#7bed9f", "#ffd32a", "#ff7f50", "#f78fb3", "#c7ecee"];
 const NAME_KEY = "pss.name";
 const CURSOR_INTERVAL_MS = 66; // about 15 updates a second (docs/multiplayer.md)
-const EMPTY: Snapshot = { people: [], pins: [], modules: [], rover: null };
+const EMPTY: Snapshot = { people: [], pins: [], modules: [], rover: null, chat: [], concepts: [] };
 
 /** What the scene session needs from the account (multiplayer/useAccount.ts): the open connection, if any. */
 export type SharedAccount = { link: Link | null; status: ConnectionStatus; error: string | null; name: string | null };
@@ -44,6 +44,12 @@ function localActions(sceneId: string, profile: () => Profile, set: Dispatch<Set
     roverArrived: () => {},
     resetRover: () => {},
     setCursor: () => {},
+    // Offline a concept stays in this browser's own gallery; there is nobody to share it with.
+    shareConcept: () => {},
+    removeConcept: () => {},
+    // Offline the chat is a local echo: nobody else receives it.
+    sendChat: (text) =>
+      set((s) => ({ ...s, chat: [...s.chat, { id: nextId--, name: profile().name, color: profile().color, text: text.trim(), sentAtMs: Date.now(), mine: true }].slice(-100) })),
   };
 }
 

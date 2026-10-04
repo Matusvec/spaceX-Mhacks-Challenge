@@ -149,3 +149,43 @@ export const resetRover = spacetimedb.reducer({ sceneId: t.string() }, (ctx, { s
   requireAccess(ctx, sceneId);
   putRover(ctx, sceneId, { x: 0, y: 0, targetX: 0, targetY: 0, targetLabel: '', driving: false });
 });
+
+const MAX_CHAT = 500;
+const KEEP_CHAT = 100;
+
+export const sendChat = spacetimedb.reducer({ sceneId: t.string(), text: t.string() }, (ctx, { sceneId, text }) => {
+  requireAccess(ctx, sceneId);
+  const who = ctx.db.user.identity.find(ctx.sender);
+  const name = who?.name ?? ctx.db.member.identity.find(ctx.sender)?.name ?? 'someone';
+  ctx.db.chatMessage.insert({ id: 0n, sceneId, author: ctx.sender, name, color: who?.color ?? '#cccccc', text: clean(text, MAX_CHAT, 'message'), sentAt: ctx.timestamp });
+  const all = [...ctx.db.chatMessage.sceneId.filter(sceneId)].sort((a, b) => (a.id < b.id ? -1 : 1));
+  for (const old of all.slice(0, Math.max(0, all.length - KEEP_CHAT))) ctx.db.chatMessage.id.delete(old.id);
+});
+
+const MAX_IMAGE_CHARS = 400_000; // about 300 KB of JPEG as base64
+const KEEP_CONCEPTS = 12;
+
+export const shareConcept = spacetimedb.reducer(
+  { sceneId: t.string(), renderId: t.string(), idea: t.string(), prompt: t.string(), poseJson: t.string(), image: t.string() },
+  (ctx, a) => {
+    requireAccess(ctx, a.sceneId);
+    if (!a.image.startsWith('data:image/')) throw new SenderError('the picture must be an image data URL');
+    if (a.image.length > MAX_IMAGE_CHARS) throw new SenderError('the picture is too large to share');
+    if (a.poseJson.length > 2000 || a.renderId.length > 100) throw new SenderError('bad concept');
+    const existing = [...ctx.db.concept.sceneId.filter(a.sceneId)].sort((x, y) => (x.id < y.id ? -1 : 1));
+    if (existing.some((c) => c.renderId === a.renderId)) return;
+    const who = ctx.db.user.identity.find(ctx.sender);
+    ctx.db.concept.insert({
+      id: 0n, sceneId: a.sceneId, author: ctx.sender, authorName: who?.name ?? 'someone', renderId: a.renderId,
+      idea: a.idea.slice(0, 400), prompt: a.prompt.slice(0, 2000), poseJson: a.poseJson, image: a.image, createdAt: ctx.timestamp,
+    });
+    for (const old of existing.slice(0, Math.max(0, existing.length + 1 - KEEP_CONCEPTS))) ctx.db.concept.id.delete(old.id);
+  },
+);
+
+export const removeConcept = spacetimedb.reducer({ id: t.u64() }, (ctx, { id }) => {
+  const row = ctx.db.concept.id.find(id);
+  if (!row) return;
+  requireAccess(ctx, row.sceneId);
+  ctx.db.concept.id.delete(id);
+});

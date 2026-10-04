@@ -1,4 +1,5 @@
 import { useEffect, useState, type DragEvent } from "react";
+import { createPortal } from "react-dom";
 import type { HoverInfo, SceneRoot } from "./scene/SceneRoot";
 import { bundleFileUrl, loadBundle, type LoadedBundle } from "./scene/loadBundle";
 import { isSplatFileName, SPLAT_EXTENSIONS } from "./scene/splat";
@@ -7,8 +8,10 @@ import { useConcept } from "./concept/useConcept";
 import { MODULE_LABELS } from "./config/scoring";
 import { useSharedScene, type SharedAccount } from "./multiplayer/useSharedScene";
 import { useRoverBroadcast, useSharedSync } from "./multiplayer/useSharedSync";
+import { useSharedConcepts } from "./multiplayer/useSharedConcepts";
 import { sampleHeight } from "./scene/heightfield";
 import { SharedPanel } from "./ui/SharedPanel";
+import { TeamChat } from "./ui/TeamChat";
 import { Shell } from "./ui/Shell";
 import { BasecampPanel } from "./ui/BasecampPanel";
 import { LayersPanel } from "./ui/LayersPanel";
@@ -55,6 +58,7 @@ function Studio({ sceneId, account }: { sceneId: string; account: SharedAccount 
   const sharedSync = useSharedSync({ shared, roverSync, sceneRoot, body, rover, basecamp, hover });
   const heightAt = (x: number, y: number) => (displayedBundle && sampleHeight(displayedBundle.heightfield, x, y)) ?? 0;
   const concept = useConcept(sceneRoot, displayedBundle?.manifest ?? null, basecamp.placement);
+  useSharedConcepts(shared, concept, displayedBundle?.manifest.scene_id ?? null);
   const selectedTarget = basecamp.placement && {
     x: basecamp.placement.x,
     y: basecamp.placement.y,
@@ -108,11 +112,20 @@ function Studio({ sceneId, account }: { sceneId: string; account: SharedAccount 
     if (file) openFile(file);
   };
 
+  const shellBar = document.querySelector(".shell-bar");
+  const liveText = shared.status === "live" ? `live ${shared.people.length}` : shared.status === "connecting" ? "connecting" : "offline, not shared";
+
   return (
     <div className="app">
       <aside className="panel">
         {bundle ? (
-          <ScenePanel bundle={bundle} presentation={presentation} onPresentation={setPresentation} onDrive={rover.driveTo} />
+          <ScenePanel bundle={bundle} presentation={presentation} onPresentation={setPresentation} onDrive={rover.driveTo}>
+            <details className="fold" open>
+              <summary>Layers · terrain and splat</summary>
+              <LayersPanel layer={rasterLayer} />
+              <SplatLayersPanel layer={splatLayer} />
+            </details>
+          </ScenePanel>
         ) : (
           <section>
             <p className="eyebrow">Scene</p>
@@ -120,19 +133,6 @@ function Studio({ sceneId, account }: { sceneId: string; account: SharedAccount 
             {error ? <p className="error">Could not load scene: {error}</p> : <p className="muted">Loading…</p>}
           </section>
         )}
-        <LayersPanel layer={rasterLayer} />
-        <SplatLayersPanel layer={splatLayer} />
-        <SharedPanel
-          shared={shared}
-          sceneRoot={displayedBundle && sceneRoot}
-          heightAt={heightAt}
-          onDrive={rover.driveTo}
-          driving={rover.route?.status === "driving"}
-          basecampPlacing={basecamp.placing}
-          onBeginPick={() => basecamp.setPlacing(false)}
-          editingModuleId={sharedSync.editingId}
-          onKeepModule={sharedSync.keepModule}
-        />
         <SplatPanel
           state={splat.state}
           onOpenFile={openFile}
@@ -146,9 +146,13 @@ function Studio({ sceneId, account }: { sceneId: string; account: SharedAccount 
         <ViewerCanvas onReady={setSceneRoot} onHover={setHover} />
         <CameraBar sceneRoot={sceneRoot} />
         <ConceptOverlay sceneRoot={displayedBundle && sceneRoot} concept={concept} sceneId={displayedBundle?.manifest.scene_id ?? null} heightAt={heightAt} />
-        <div className={`chip chip-${shared.status} stage-chip`}>
-          {shared.status === "live" ? `live, ${shared.people.length} ${shared.people.length === 1 ? "person" : "people"}` : shared.status === "connecting" ? "connecting…" : "offline: access not checked, not shared"}
-        </div>
+        {/* Who is here, as plain text in the header bar next to the scene switcher (over the view when there is no bar). */}
+        {shellBar ? (
+          // Offline is already said in the header by the account status.
+          shared.status !== "offline" && createPortal(<span className={`chip chip-${shared.status}`}>{liveText}</span>, shellBar)
+        ) : (
+          <div className={`chip chip-${shared.status} stage-chip`}>{liveText}</div>
+        )}
         {hover && (
           <div className="readout">
             x {hover.x.toFixed(1)} m E · y {hover.y.toFixed(1)} m N · elevation {hover.z.toFixed(2)} m
@@ -171,7 +175,25 @@ function Studio({ sceneId, account }: { sceneId: string; account: SharedAccount 
       </main>
       <aside className="panel panel-right">
         <BasecampPanel basecamp={basecamp} concept={concept} />
-        <RoverPanel rover={rover} selectedTarget={selectedTarget} />
+        <details className="fold single" open>
+          <summary>Rover · drive and routes</summary>
+          <RoverPanel rover={rover} selectedTarget={selectedTarget} />
+        </details>
+        <details className="fold single" open>
+          <summary>People · pins and modules</summary>
+          <SharedPanel
+            shared={shared}
+            sceneRoot={displayedBundle && sceneRoot}
+            heightAt={heightAt}
+            onDrive={rover.driveTo}
+            driving={rover.route?.status === "driving"}
+            basecampPlacing={basecamp.placing}
+            onBeginPick={() => basecamp.setPlacing(false)}
+            editingModuleId={sharedSync.editingId}
+            onKeepModule={sharedSync.keepModule}
+          />
+          <TeamChat shared={shared} />
+        </details>
       </aside>
     </div>
   );

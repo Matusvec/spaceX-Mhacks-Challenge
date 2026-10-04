@@ -33,14 +33,14 @@ export async function accountsScenario(codes, clients) {
   // c. Mission control opens Mars, then hops to the Moon in the same tab: no page load in between.
   await mia.evaluate(`window.__sameDocument = true`);
   await mia.evaluate(`document.querySelector('.scene-card[data-scene="mars-hero-01"]').click()`);
-  await mia.until(/live, 1 person/, "Mars to open live", 120000);
+  await mia.until(/live 1\b/i, "Mars to open live", 120000);
   await mia.until(/Best sites[\s\S]*Site 1/i, "the Mars scene to load", 120000);
   // Presence on the scene list: NASA's Mars card names who is in there right now.
-  await nia.until(/1 live\s*Mia/, "Mia shown live on Nia's Mars card");
+  await nia.until(/1 live\s*Mia/i, "Mia shown live on Nia's Mars card");
   await sleep(3000);
   await mia.shoot("mp-acc-3-mission-control-mars.png");
   await mia.select('select[name="scene-switcher"]', "moon-malapert-01");
-  await mia.until(/Malapert Massif[\s\S]*live, 1 person/i, "the Moon to open live", 120000);
+  await mia.until(/Malapert Massif[\s\S]*live 1\b/i, "the Moon to open live", 120000);
   await mia.until(/Best sites[\s\S]*Site 1/i, "the Moon scene to load", 120000);
   await sleep(3000);
   if (!(await mia.evaluate(`window.__sameDocument === true && location.search.includes("scene=moon-malapert-01")`))) {

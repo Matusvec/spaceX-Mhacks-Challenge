@@ -76,6 +76,14 @@ export function joinScene({ conn, identity: self }: Link, options: Options): Sce
           scale: m.scale,
           scoreJson: m.scoreJson,
         })),
+      concepts: [...conn.db.concept.iter()]
+        .filter((c) => c.sceneId === sceneId)
+        .sort(byId)
+        .map((c) => ({ id: c.id, renderId: c.renderId, authorName: c.authorName, mine: mine(c.author), idea: c.idea, prompt: c.prompt, poseJson: c.poseJson, image: c.image, createdAtMs: Number(c.createdAt.microsSinceUnixEpoch / 1000n) })),
+      chat: [...conn.db.chatMessage.iter()]
+        .filter((m) => m.sceneId === sceneId)
+        .sort(byId)
+        .map((m) => ({ id: m.id, name: m.name, color: m.color, text: m.text, sentAtMs: Number(m.sentAt.microsSinceUnixEpoch / 1000n), mine: mine(m.author) })),
       rover: rover
         ? { x: rover.x, y: rover.y, targetX: rover.targetX, targetY: rover.targetY, targetLabel: rover.targetLabel, driving: rover.driving, seq: rover.seq, mine: mine(rover.driver) }
         : null,
@@ -101,7 +109,7 @@ export function joinScene({ conn, identity: self }: Link, options: Options): Sce
     emitCursors();
   };
 
-  const snapshotTables = [conn.db.pin, conn.db.placedModule, conn.db.rover] as const;
+  const snapshotTables = [conn.db.pin, conn.db.placedModule, conn.db.rover, conn.db.chatMessage, conn.db.concept] as const;
   for (const table of snapshotTables) {
     table.onInsert(scheduleRefresh);
     table.onUpdate(scheduleRefresh);
@@ -129,6 +137,8 @@ export function joinScene({ conn, identity: self }: Link, options: Options): Sce
       tables.pin.where((r) => r.sceneId.eq(sceneId)),
       tables.placedModule.where((r) => r.sceneId.eq(sceneId)),
       tables.rover.where((r) => r.sceneId.eq(sceneId)),
+      tables.chatMessage.where((r) => r.sceneId.eq(sceneId)),
+      tables.concept.where((r) => r.sceneId.eq(sceneId)),
     ]);
   void join();
 
@@ -149,6 +159,9 @@ export function joinScene({ conn, identity: self }: Link, options: Options): Sce
       void call(() => conn.reducers.driveRover({ sceneId, fromX: from.x, fromY: from.y, toX: to.x, toY: to.y, label })),
     roverArrived: (seq) => void call(() => conn.reducers.roverArrived({ sceneId, seq })),
     resetRover: () => void call(() => conn.reducers.resetRover({ sceneId })),
+    sendChat: (text) => void call(() => conn.reducers.sendChat({ sceneId, text })),
+    shareConcept: (draft) => void call(() => conn.reducers.shareConcept({ sceneId, ...draft })),
+    removeConcept: (id) => void call(() => conn.reducers.removeConcept({ id })),
     setCursor: (pose) =>
       void call(() =>
         pose

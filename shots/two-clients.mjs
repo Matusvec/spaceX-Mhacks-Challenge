@@ -23,7 +23,7 @@ async function offlineScenario() {
   const cy = await open("Cy", { scene: sceneId });
   clients.push(cy);
   await cy.signIn(codes.control);
-  await cy.until(/live, 1 person/, "the live chip", 120000);
+  await cy.until(/live 1\b/i, "the live chip", 120000);
   await cy.until(/Best sites[\s\S]*Site 1/i, "the scene to load", 120000);
   console.log(">>> stop the Spacetime server now");
   await cy.until(/offline: access not checked, not shared/, "the offline chip", 120000);
@@ -43,7 +43,7 @@ async function offlineScenario() {
   console.log("offline       Cy:", await cy.section());
   await cy.shoot("mp-offline-1-works-locally.png");
   console.log(">>> start the Spacetime server now");
-  await cy.until(/live, 1 person/, "the chip to go live once the server is back", 120000);
+  await cy.until(/live 1\b/i, "the chip to go live once the server is back", 120000);
   await cy.until(/Offline pin/, "the offline pin to come back from the table");
   await sleep(1000);
   console.log("back online   Cy:", await cy.section());
@@ -66,7 +66,7 @@ async function sharedScenario() {
   clients.push(ada, ben);
   await ada.signIn(codes.nasa);
   await ben.signIn(codes.control);
-  for (const c of clients) await c.until(/live, 2 people/, "the live chip with both people", 120000);
+  for (const c of clients) await c.until(/live 2\b/i, "the live chip with both people", 120000);
   for (const c of clients) {
     await hideGrade(c);
     await c.view(EYE, TARGET);
@@ -100,6 +100,38 @@ async function sharedScenario() {
   await sleep(800);
   await ada.shoot("mp-2-ada-sees-both-pins.png");
   await ben.shoot("mp-2-ben-sees-both-pins.png");
+
+  // 4b. Team chat: Ada writes, Ben reads it (people to people, not the rover assistant).
+  await ada.type('input[name="team-chat"]', "Ben, meet me at the outcrop");
+  await sleep(100);
+  await ada.evaluate(`document.querySelector(".team-chat-input").requestSubmit()`);
+  await ben.until(/Ben, meet me at the outcrop/, "Ada's chat line on Ben's screen");
+  await ben.evaluate(`document.querySelector(".team-chat").scrollIntoView({ block: "end" })`);
+  await sleep(300);
+  await ben.shoot("mp-7-ben-team-chat.png");
+  console.log("4b. chat      Ben:", await ben.evaluate(`document.querySelector(".team-chat-messages").innerText.replace(/\\s+/g, " ")`));
+
+  // 4c. Shared concept: Ada shares a picture of her view with its camera pose (a stand-in for a Grok render,
+  //     same size and path as a real one: a 1024 px JPEG in the table row); Ben gets it, pinned, and opens it.
+  const sharedSize = await ada.evaluate(`(async () => {
+    const view = window.__sceneRoot.captureView();
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024; canvas.height = Math.round(1024 * view.height / view.width);
+    canvas.getContext("2d").drawImage(view, 0, 0, canvas.width, canvas.height);
+    const image = canvas.toDataURL("image/jpeg", 0.75);
+    const pose = window.__sceneRoot.lastCapturedPose();
+    const room = new URLSearchParams(location.search).get("room");
+    await window.__spacetime.reducers.shareConcept({ sceneId: "${sceneId}#" + room, renderId: "test-" + Date.now(), idea: "Three domes by the outcrop",
+      prompt: "test picture, not a Grok render", poseJson: JSON.stringify(pose), image });
+    return Math.round(image.length / 1024);
+  })()`);
+  await ben.until(/Three domes by the outcrop · by Ada/, "Ada's shared concept in Ben's Concepts list", 30000);
+  await ben.evaluate(`[...document.querySelectorAll(".concept-list li")].find((li) => li.innerText.includes("by Ada")).querySelector("button").click()`);
+  await sleep(2500);
+  await ben.shoot("mp-8-ben-opens-ada-concept.png");
+  console.log(`4c. concept   Ben: sees and opens Ada's concept (picture ${sharedSize} KB in the row)`);
+  await ben.evaluate(`window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))`);
+  await sleep(500);
 
   // 5. Ada drives the rover to pin 1 through the chat; Ben's rover drives too.
   console.log("5. drive      Ada:", await ada.chat("drive to pin 1"));
@@ -148,9 +180,9 @@ async function sharedScenario() {
   const zoe = await open("Zoe");
   clients.push(zoe);
   await zoe.signIn(codes.control);
-  await zoe.until(/2 live\s*Ada\s*Ben/, "Ada and Ben shown live on Zoe's Mars card");
+  await zoe.until(/2 live\s*Ada\s*Ben/i, "Ada and Ben shown live on Zoe's Mars card");
   await sleep(500);
   await zoe.shoot("mp-acc-6-scenes-two-live.png");
-  console.log("9. presence   Zoe:", (await zoe.text()).match(/2 live\s*Ada\s*Ben/)?.[0].replace(/\s+/g, " "));
+  console.log("9. presence   Zoe:", (await zoe.text()).match(/2 live\s*Ada\s*Ben/i)?.[0].replace(/\s+/g, " "));
   console.log("two clients: ok");
 }
