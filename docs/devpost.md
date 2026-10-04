@@ -62,5 +62,7 @@ React, TypeScript, three.js, Spark, SpacetimeDB, FastAPI, xAI Grok (Imagine, Voi
 
 ## Images for the gallery
 
+- `docs/figures/shared_concept_swipe_live.png`: the live site; Ben (NASA) opens Ada's Grok Imagine concept, swiping between the real 3D scene and her render, with LIVE 2 and the team chat on the right. Use this one first.
+- `docs/figures/landing_page.png`: the access-code landing page.
 - `docs/figures/orbit_vs_splat.png`: the same 18 m disc from orbit and from our splat.
 - `docs/figures/grok_imagine_view_vs_render.jpg`: our 3D view and Grok Imagine's concept on it.
