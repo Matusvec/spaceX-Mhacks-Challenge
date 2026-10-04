@@ -176,7 +176,7 @@ class Turn(BaseModel):
 class IntentContext(BaseModel):
     selected_module_id: int | None = None
     pins: list[str] = []
-    facts: str = Field("", max_length=8000)  # what the viewer has loaded for this scene, as plain text
+    facts: str = Field("", max_length=16000)  # what the viewer has loaded for this scene, as plain text
     history: list[Turn] = Field([], max_length=8)  # the last few turns, so follow-up questions work
 
 

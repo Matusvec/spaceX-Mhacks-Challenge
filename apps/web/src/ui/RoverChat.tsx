@@ -3,6 +3,7 @@ import { useDraggableWindow } from "./useDraggableWindow";
 import { executeIntent, HELP_TEXT, type ChatReply, type ExecuteContext } from "../rover/executeIntent";
 import { interpret, type ChatTurn } from "../rover/interpret";
 import { sceneFacts } from "../rover/sceneFacts";
+import { assessFeasibility } from "../concept/feasibility";
 import { TeamCodeField } from "../rover/TeamCodeField";
 import { GROK_STATUS_TEXT, useGrokStatus } from "../rover/useGrokStatus";
 import { useVoice } from "../voice/useVoice";
@@ -42,6 +43,14 @@ export function RoverChat({ context }: { context: ExecuteContext | null }) {
   }, [messages, open]);
 
   const grokStatus = useGrokStatus();
+
+  // A concept render just made here gets feasibility notes from Grok, from the same scene facts the chat sends.
+  const madeId = context?.concept.madeId ?? null;
+  useEffect(() => {
+    const ctx = contextRef.current;
+    const made = ctx?.concept.renders.find((r) => r.id === madeId);
+    if (ctx && made) void assessFeasibility(made.id, made.idea, ctx.manifest.scene_id, sceneFacts(ctx)).catch(() => undefined);
+  }, [madeId]);
 
   // `spoken`: the text came from the microphone (Grok Voice), so the reply is read aloud too.
   const send = async (text: string, spoken = false) => {

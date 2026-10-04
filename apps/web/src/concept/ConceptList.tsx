@@ -1,9 +1,11 @@
 import { conceptName, setPinned, showInViewer, useConceptPoses } from "./conceptPoses";
+import { FEASIBILITY_HEADING, useFeasibilityNotes } from "./feasibility";
 import type { Concept } from "./useConcept";
 
 /** "Concepts": the renders this browser can put back into the viewer, pinned ones first. */
 export function ConceptList({ concept }: { concept: Concept }) {
   const { poses, viewId } = useConceptPoses();
+  const notes = useFeasibilityNotes();
   const sceneId = concept.renders[0]?.scene_id;
   const inGallery = new Set(concept.renders.map((r) => r.id));
   const rows = Object.entries(poses)
@@ -26,6 +28,13 @@ export function ConceptList({ concept }: { concept: Concept }) {
               <button onClick={() => setPinned(id, !entry.pinned)}>{entry.pinned ? "Unpin" : "Pin to site"}</button>
             </div>
             {!inGallery.has(id) && <span className="muted">Its picture is no longer in the gallery.</span>}
+            {notes[id] && (
+              <p className="concept-notes">
+                <span className="estimate">{FEASIBILITY_HEADING}</span>
+                <br />
+                {notes[id]}
+              </p>
+            )}
           </li>
         ))}
       </ul>

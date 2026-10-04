@@ -167,6 +167,10 @@ function Studio({ sceneId, account }: { sceneId: string; account: SharedAccount 
               basecamp,
               selectedTarget,
               concept,
+              sharedModules: shared.modules,
+              rasters: displayedBundle.rasters,
+              splatFields: displayedBundle.splatLayers?.schema.fields,
+              shielding: displayedBundle.shielding,
               userPins: { pins: shared.pins, add: (x, y, note) => shared.actions.addPin({ x, y, z: heightAt(x, y) }, note) },
             }
           }

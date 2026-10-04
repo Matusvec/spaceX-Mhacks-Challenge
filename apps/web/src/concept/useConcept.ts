@@ -20,6 +20,7 @@ export function useConcept(sceneRoot: SceneRoot | null, manifest: SceneManifest 
   const [busySince, setBusySince] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [madeId, setMadeId] = useState<string | null>(null); // the render made last in this session (feasibility notes)
   // The chat calls render() from an older closure, so it reads the latest values through this ref.
   const latest = useRef({ sceneRoot, sceneId, placement, idea, busy: false });
   latest.current = { sceneRoot, sceneId, placement, idea, busy: busySince !== null };
@@ -68,6 +69,7 @@ export function useConcept(sceneRoot: SceneRoot | null, manifest: SceneManifest 
         return next;
       });
       setOpenId(done.id);
+      setMadeId(done.id);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message === "Failed to fetch" ? "Could not reach the backend." : message);
@@ -82,6 +84,7 @@ export function useConcept(sceneRoot: SceneRoot | null, manifest: SceneManifest 
 
   return {
     adopt,
+    madeId,
     available: hasBackend,
     ready: sceneRoot !== null && sceneId !== null,
     renders,

@@ -1,8 +1,9 @@
 import type { Concept } from "../concept/useConcept";
 import { MODULE_LABELS, SCORING } from "../config/scoring";
-import type { Intent, SceneManifest, SciencePin } from "../contracts";
+import type { Intent, LayerField, RasterLayer, SceneManifest, SciencePin, Shielding } from "../contracts";
 import type { CandidateSite } from "../modules/siteSearch";
 import { addPinFromChat, findUserPin, type UserPinContext } from "../multiplayer/pinChat";
+import type { SharedModule } from "../multiplayer/types";
 import type { Basecamp } from "../ui/useBasecamp";
 import type { RouteTarget, Rover } from "../ui/useRover";
 import { interpretLocally } from "./localInterpreter";
@@ -18,6 +19,11 @@ export type ExecuteContext = {
   // User pins (people's notes, shared through Spacetime); never mixed into the science `pins`.
   userPins?: UserPinContext;
   concept: Concept;
+  // For Grok's scene facts (sceneFacts.ts): every module in the shared session, and what the scene's layers are.
+  sharedModules?: SharedModule[];
+  rasters?: RasterLayer[];
+  splatFields?: LayerField[];
+  shielding?: Shielding | null;
 };
 
 export const HELP_TEXT = [

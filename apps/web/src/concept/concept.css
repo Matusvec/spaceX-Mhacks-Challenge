@@ -250,3 +250,8 @@ button.concept-go {
   background: none;
   outline: 1px solid #5a6072;
 }
+
+.concept-notes {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
