@@ -8,6 +8,8 @@ export type ScoringContext = {
   heightfield: Heightfield;
   slopeDeg: Float32Array;
   pins: SciencePin[];
+  // Whether the rover can drive to site (x, y); omitted until a rover position is known.
+  isReachable?: (x: number, y: number) => boolean;
 };
 
 export type SitePlacement = { type: ModuleType; x: number; y: number; rotationZDeg: number };
@@ -89,6 +91,10 @@ export function evaluateSite(site: SitePlacement, ctx: ScoringContext): SiteEval
       `${Math.round(distToScienceM)} m to the nearest science pin (ideal under ${SCORING.scienceIdealM} m)`,
     );
   }
+  const roverReachable = ctx.isReachable ? ctx.isReachable(site.x, site.y) : null;
+  if (roverReachable === false) {
+    penalize(weights.access, 1, `rover cannot reach this site without slopes over ${SCORING.roverSlopeLimitDeg}°`);
+  }
 
   return {
     score: {
@@ -98,7 +104,7 @@ export function evaluateSite(site: SitePlacement, ctx: ScoringContext): SiteEval
       flatnessM,
       cutFillM3,
       distToScienceM,
-      roverReachable: null,
+      roverReachable,
       notes,
     },
     padHeightM,

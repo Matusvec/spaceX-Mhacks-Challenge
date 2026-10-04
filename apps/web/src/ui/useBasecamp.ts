@@ -3,30 +3,24 @@ import type { ModuleType } from "../contracts";
 import { evaluateSite, type ScoringContext, type SitePlacement } from "../modules/scoring";
 import { computeSuitability, findTopSites, siteSeparationM, type CandidateSite } from "../modules/siteSearch";
 import { sampleHeight } from "../scene/heightfield";
-import type { LoadedBundle } from "../scene/loadBundle";
 import type { SceneRoot } from "../scene/SceneRoot";
-import { computeSlopeDeg } from "../scene/slope";
+import type { TerrainAnalysis } from "./useTerrainAnalysis";
 
 const TOP_SITE_COUNT = 3;
 const ROTATE_STEP_DEG = 15;
 
-// `bundle` must be the bundle SceneRoot is currently showing, so overlays are drawn after it.
-export function useBasecamp(sceneRoot: SceneRoot | null, bundle: LoadedBundle | null) {
+// `analysis` must be for the bundle SceneRoot is currently showing, so overlays are drawn after it.
+export function useBasecamp(
+  sceneRoot: SceneRoot | null,
+  analysis: TerrainAnalysis | null,
+  isReachable: ((x: number, y: number) => boolean) | undefined,
+) {
   const [moduleType, setModuleTypeState] = useState<ModuleType>("habitat");
   const [showMap, setShowMap] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [placement, setPlacement] = useState<SitePlacement | null>(null);
 
-  const ctx = useMemo<ScoringContext | null>(
-    () =>
-      bundle && {
-        body: bundle.manifest.body,
-        heightfield: bundle.heightfield,
-        slopeDeg: computeSlopeDeg(bundle.heightfield),
-        pins: bundle.pins,
-      },
-    [bundle],
-  );
+  const ctx = useMemo<ScoringContext | null>(() => analysis && { ...analysis, isReachable }, [analysis, isReachable]);
   const grid = useMemo(() => (ctx ? computeSuitability(moduleType, ctx) : null), [ctx, moduleType]);
   const topSites = useMemo(
     () => (grid && ctx ? findTopSites(grid, TOP_SITE_COUNT, siteSeparationM(moduleType, ctx)) : []),
@@ -37,7 +31,7 @@ export function useBasecamp(sceneRoot: SceneRoot | null, bundle: LoadedBundle | 
   useEffect(() => {
     setPlacement(null);
     setPlacing(false);
-  }, [bundle]);
+  }, [analysis]);
 
   useEffect(() => sceneRoot?.setSuitability(showMap ? grid : null), [sceneRoot, grid, showMap]);
   useEffect(() => sceneRoot?.setSiteMarkers(topSites), [sceneRoot, topSites]);
@@ -73,7 +67,7 @@ export function useBasecamp(sceneRoot: SceneRoot | null, bundle: LoadedBundle | 
 
   const goToSite = (site: CandidateSite) => {
     setPlacement({ type: moduleType, x: site.x, y: site.y, rotationZDeg: 0 });
-    const z = bundle ? (sampleHeight(bundle.heightfield, site.x, site.y) ?? 0) : 0;
+    const z = analysis ? (sampleHeight(analysis.heightfield, site.x, site.y) ?? 0) : 0;
     sceneRoot?.flyToSite(site.x, site.y, z, 120);
   };
 
@@ -90,7 +84,7 @@ export function useBasecamp(sceneRoot: SceneRoot | null, bundle: LoadedBundle | 
     goToSite,
     rotate,
     removeModule: () => setPlacement(null),
-    resolutionM: bundle?.manifest.terrain.resolution_m ?? null,
+    resolutionM: analysis?.resolutionM ?? null,
   };
 }
 

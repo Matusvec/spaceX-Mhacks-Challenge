@@ -22,7 +22,10 @@ function heightAt(x, y) {
   const r = Math.hypot(x + 250, y + 250); // crater centered south-west
   const crater = -18 * Math.exp(-((r / 70) ** 2)) + 6 * Math.exp(-(((r - 90) / 25) ** 2));
   const centerFlatness = 1 - Math.exp(-((x ** 2 + y ** 2) / 120 ** 2));
-  return rolling * centerFlatness + hill + crater;
+  // A mesa in the north-west with cliffs too steep for a rover (well over 30 degrees).
+  const mesaEdge = Math.min(1, Math.max(0, (110 - Math.hypot(x + 230, y - 230)) / 20));
+  const mesa = 25 * mesaEdge * mesaEdge * (3 - 2 * mesaEdge);
+  return rolling * centerFlatness + hill + crater + mesa;
 }
 
 const heights = new Float64Array(PIXELS * PIXELS);

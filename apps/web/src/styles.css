@@ -215,6 +215,17 @@ button:hover {
   background: #232a37;
 }
 
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.panel section + section {
+  margin-top: 12px;
+  padding-top: 4px;
+  border-top: 1px solid #1f232d;
+}
+
 progress {
   width: 100%;
 }
