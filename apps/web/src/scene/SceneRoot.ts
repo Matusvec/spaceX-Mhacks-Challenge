@@ -9,6 +9,7 @@ import { sampleHeight } from "./heightfield";
 import type { LoadedBundle } from "./loadBundle";
 import { pickSitePoint } from "./picking";
 import { createPinMarkers } from "./pins";
+import { createPathMesh, createRoverMesh } from "./rover";
 import { loadSplatMesh, type SplatSource } from "./splat";
 import { createTerrainMesh } from "./terrain";
 
@@ -17,6 +18,19 @@ export type HoverInfo = { x: number; y: number; z: number } | null;
 export type SplatInfo = { count: number; sizeM: [number, number, number] };
 
 export type ModuleView = { type: ModuleType; x: number; y: number; z: number; rotationZDeg: number };
+
+type PathPoint = [number, number, number];
+
+type DriveAnimation = {
+  points: PathPoint[];
+  distances: number[];
+  startMs: number;
+  durationMs: number;
+  onDone: () => void;
+};
+
+// Demo playback speed for drives (real rovers are far slower); the UI says it is sped up.
+const DRIVE_PLAYBACK_M_PER_S = 40;
 
 function disposeObject(root: THREE.Object3D): void {
   root.traverse((object) => {
@@ -54,6 +68,9 @@ export class SceneRoot {
   private moduleMesh: THREE.Group | null = null;
   private placeHandler: ((x: number, y: number) => void) | null = null;
   private placing = false;
+  private rover: THREE.Group | null = null;
+  private pathMesh: THREE.Mesh | null = null;
+  private drive: DriveAnimation | null = null;
 
   constructor(
     private readonly container: HTMLElement,
@@ -91,7 +108,8 @@ export class SceneRoot {
     canvas.addEventListener("pointerup", this.handlePointerUp);
     canvas.addEventListener("pointercancel", this.handlePointerUp);
     canvas.addEventListener("pointerleave", this.handlePointerLeave);
-    this.renderer.setAnimationLoop(() => {
+    this.renderer.setAnimationLoop((timeMs) => {
+      this.updateDrive(timeMs);
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
     });
@@ -194,6 +212,55 @@ export class SceneRoot {
     this.renderer.domElement.style.cursor = handler ? "crosshair" : "";
   }
 
+  // Shows the rover at a site position (not while a drive is animating it).
+  setRover(position: { x: number; y: number; z: number } | null): void {
+    if (!position) {
+      this.drive = null;
+      if (this.rover) {
+        this.basecampRoot.remove(this.rover);
+        disposeObject(this.rover);
+        this.rover = null;
+      }
+      return;
+    }
+    if (!this.rover) {
+      this.rover = createRoverMesh();
+      this.basecampRoot.add(this.rover);
+    }
+    if (!this.drive) this.rover.position.set(position.x, position.y, position.z);
+  }
+
+  setPath(points: PathPoint[] | null): void {
+    if (this.pathMesh) {
+      this.basecampRoot.remove(this.pathMesh);
+      disposeObject(this.pathMesh);
+      this.pathMesh = null;
+    }
+    if (points && points.length >= 2) {
+      this.pathMesh = createPathMesh(points);
+      this.basecampRoot.add(this.pathMesh);
+    }
+  }
+
+  // Animates the rover along `points`, then calls onDone.
+  driveRover(points: PathPoint[], onDone: () => void): void {
+    if (!this.rover || points.length < 2) return onDone();
+    const distances = [0];
+    for (let i = 1; i < points.length; i++) {
+      const [ax, ay] = points[i - 1];
+      const [bx, by] = points[i];
+      distances.push(distances[i - 1] + Math.hypot(bx - ax, by - ay));
+    }
+    const total = distances[distances.length - 1];
+    this.drive = {
+      points,
+      distances,
+      startMs: performance.now(),
+      durationMs: Math.max(2000, (total / DRIVE_PLAYBACK_M_PER_S) * 1000),
+      onDone,
+    };
+  }
+
   flyToSite(x: number, y: number, z: number, distanceM: number): void {
     this.scene.updateMatrixWorld(true);
     this.lookAtWorld(this.siteRoot.localToWorld(new THREE.Vector3(x, y, z)), distanceM);
@@ -214,6 +281,27 @@ export class SceneRoot {
     this.spark.dispose();
     this.renderer.dispose();
     canvas.remove();
+  }
+
+  private updateDrive(timeMs: number): void {
+    const drive = this.drive;
+    if (!drive || !this.rover) return;
+    const { points, distances } = drive;
+    const total = distances[distances.length - 1];
+    const t = Math.min(1, (timeMs - drive.startMs) / drive.durationMs);
+    const along = t * total;
+    let i = 1;
+    while (i < points.length - 1 && distances[i] < along) i++;
+    const [ax, ay, az] = points[i - 1];
+    const [bx, by, bz] = points[i];
+    const segment = distances[i] - distances[i - 1];
+    const f = segment > 0 ? (along - distances[i - 1]) / segment : 1;
+    this.rover.position.set(ax + (bx - ax) * f, ay + (by - ay) * f, az + (bz - az) * f);
+    if (segment > 0) this.rover.rotation.z = Math.atan2(by - ay, bx - ax);
+    if (t >= 1) {
+      this.drive = null;
+      drive.onDone();
+    }
   }
 
   // Keeps the current viewing direction and moves the camera to look at `target` from `distance`.
@@ -259,6 +347,9 @@ export class SceneRoot {
     this.suitability = null;
     this.siteMarkers = null;
     this.moduleMesh = null;
+    this.rover = null;
+    this.pathMesh = null;
+    this.drive = null;
     this.terrain = null;
     this.bundle = null;
   }

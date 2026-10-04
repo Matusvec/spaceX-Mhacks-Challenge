@@ -2,11 +2,16 @@ import { useEffect, useState, type DragEvent } from "react";
 import type { HoverInfo, SceneRoot } from "./scene/SceneRoot";
 import { bundleFileUrl, loadBundle, type LoadedBundle } from "./scene/loadBundle";
 import { isSplatFileName, SPLAT_EXTENSIONS } from "./scene/splat";
+import { MODULE_LABELS } from "./config/scoring";
 import { BasecampPanel } from "./ui/BasecampPanel";
+import { RoverChat } from "./ui/RoverChat";
+import { RoverPanel } from "./ui/RoverPanel";
 import { ScenePanel } from "./ui/ScenePanel";
 import { useBasecamp } from "./ui/useBasecamp";
+import { useRover } from "./ui/useRover";
 import { SplatPanel } from "./ui/SplatPanel";
 import { useSplatLoader } from "./ui/useSplatLoader";
+import { useTerrainAnalysis } from "./ui/useTerrainAnalysis";
 import { ViewerCanvas } from "./ui/ViewerCanvas";
 
 const DEFAULT_SCENE_ID = "placeholder-mars";
@@ -25,7 +30,14 @@ export function App() {
   const [displayedBundle, setDisplayedBundle] = useState<LoadedBundle | null>(null);
   const splat = useSplatLoader(sceneRoot);
   const { load: loadSplat, fail: failSplat } = splat;
-  const basecamp = useBasecamp(sceneRoot, displayedBundle);
+  const analysis = useTerrainAnalysis(displayedBundle);
+  const rover = useRover(sceneRoot, analysis);
+  const basecamp = useBasecamp(sceneRoot, analysis, rover.isReachable);
+  const selectedTarget = basecamp.placement && {
+    x: basecamp.placement.x,
+    y: basecamp.placement.y,
+    label: `${MODULE_LABELS[basecamp.placement.type].toLowerCase()} at (${basecamp.placement.x.toFixed(0)}, ${basecamp.placement.y.toFixed(0)})`,
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -99,9 +111,23 @@ export function App() {
             x {hover.x.toFixed(1)} m E · y {hover.y.toFixed(1)} m N · elevation {hover.z.toFixed(2)} m
           </div>
         )}
+        <RoverChat
+          context={
+            displayedBundle && {
+              manifest: displayedBundle.manifest,
+              pins: displayedBundle.pins,
+              rover,
+              basecamp,
+              selectedTarget,
+            }
+          }
+        />
         {dragging && <div className="drop-overlay">Drop a {SPLAT_EXTENSIONS.join(" / ")} splat to preview it</div>}
       </main>
-      <BasecampPanel basecamp={basecamp} />
+      <aside className="panel panel-right">
+        <BasecampPanel basecamp={basecamp} />
+        <RoverPanel rover={rover} selectedTarget={selectedTarget} />
+      </aside>
     </div>
   );
 }

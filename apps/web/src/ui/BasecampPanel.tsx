@@ -9,7 +9,7 @@ export function BasecampPanel({ basecamp }: { basecamp: Basecamp }) {
   const { evaluation, placement } = basecamp;
 
   return (
-    <aside className="panel panel-right">
+    <section>
       <p className="eyebrow">Base camp</p>
       <h1>Where to build</h1>
 
@@ -78,6 +78,6 @@ export function BasecampPanel({ basecamp }: { basecamp: Basecamp }) {
       ) : (
         <p className="muted">Pick a best site or place a module to see its scorecard.</p>
       )}
-    </aside>
+    </section>
   );
 }

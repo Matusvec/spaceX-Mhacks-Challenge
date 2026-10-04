@@ -8,6 +8,10 @@ export const SCORING = {
   scienceIdealM: 50,
   scienceMaxM: 500,
   roverSlopeLimitDeg: 30,
+  // Route planning grid size (docs: 2 to 5 m on Mars, 5 to 20 m on the Moon).
+  roverGridM: { mars: 4, moon: 10 } satisfies Record<Body, number>,
+  // Each route step costs distance * (1 + this * slope in degrees), so gentle ground is preferred.
+  roverSlopeCostPerDeg: 0.1,
   // Full slope penalty once the max slope reaches this multiple of the module's limit.
   slopeWorstFactor: 2,
   // Full flatness penalty at this height standard deviation under the footprint.
