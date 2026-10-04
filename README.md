@@ -2,7 +2,7 @@
 
 Figma for planetary surfaces. A shared, live 3D workspace where a team stands inside a real place on Mars or the Moon, reads the science embedded in the ground, and designs where humans could build.
 
-Built at MHacks 2026 (Oct 3 to 4, Ann Arbor) by Matus Vecera, Claire Huang, and Humyra Ferdus.
+Built at MHacks 2026 (Oct 3 to 4, Ann Arbor) by Matus Vecera, Claire Huang, and Humyra Ferdus, members of the Notre Dame Data Club.
 
 ## What it does
 
